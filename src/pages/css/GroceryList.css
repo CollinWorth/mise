@@ -1,0 +1,251 @@
+/* Base page wrapper */
+.grocery-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #fdf6f1; /* Light cream */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Sticky Header */
+.grocery-header {
+  position: sticky;
+  top: 0;
+  background: #fdf6f1; /* Light cream */
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 2px solid #c4832d; /* Warm caramel */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Add item button container */
+.add-item-button button {
+  font-size: 1.1rem;
+  padding: 10px 28px;
+  background-color: #c4832d; /* Warm caramel */
+  color: #fffaf3; /* Cream */
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: background 0.2s;
+}
+.add-item-button button:hover {
+  background-color: #843c0c; /* Dark caramel */
+}
+
+/* Layout grid: left sidebar and main section */
+.grocery-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr; /* Adjusted to fill space */
+  gap: 24px;
+  padding: 2rem 3rem;
+  flex-grow: 1;
+  background-color: #fdf6f1; /* Light cream */
+}
+
+/* Left Sidebar */
+.grocery-sidebar-left {
+  background-color: #264a42; /* Dark green */
+  border-radius: 14px;
+  padding: 1.5rem 1.8rem;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);
+  color: #c4832d; /* Warm caramel */
+  font-weight: 600;
+}
+.grocery-sidebar-left h3 {
+  margin-bottom: 1rem;
+  color: #f4b25b; /* Light caramel */
+}
+.grocery-sidebar-left ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  color: #f4b25b;
+}
+.grocery-sidebar-left ul li {
+  margin-bottom: 0.7rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  color: #f4b25b;
+}
+.grocery-sidebar-left ul li:hover {
+  color: #f3c384; /* Light caramel */
+}
+
+/* Main Grocery Area */
+.grocery {
+  text-align: center;
+  padding: 2rem;
+  background-color: #f4e3d7; /* Soft beige */
+  border-radius: 14px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);
+  color: #264a42; /* Dark green */
+}
+
+.grocery h1 {
+  font-size: 2.5rem;
+  color: #264a42; /* Dark green */
+  margin-bottom: 0.25rem;
+}
+
+.grocery p {
+  font-size: 1.2rem;
+  color: #6a7370; /* Muted gray */
+  margin-bottom: 2rem;
+}
+
+/* Grocery List Container */
+.grocery-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+}
+
+/* Grocery Card */
+.grocery-card {
+  background-color: #264a42; /* Dark green */
+  border: 1.5px solid #c4832d; /* Warm caramel */
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 320px;
+  text-align: left;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.grocery-details-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  color: #f4b25b; /* Light caramel */
+}
+
+.remove-item {
+  background-color: #c4832d; /* Warm caramel */
+  color: #fffaf3; /* Cream */
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.remove-item:hover {
+  background-color: #843c0c; /* Dark caramel */
+}
+
+/* Grocery List Page Container */
+.grocery-list-container {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 2rem 3rem;
+  background-color: #fdf6f1; /* Light cream */
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(38, 74, 66, 0.2);
+  color: #264a42; /* Dark green */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Heading Styles */
+.grocery-list-container h1,
+.grocery-list-container h2 {
+  color: #264a42; /* Dark green */
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+/* Dropdown Styles */
+.grocery-list-container select {
+  padding: 0.6rem;
+  font-size: 1rem;
+  border-radius: 6px;
+  border: 2px solid #c4832d; /* Warm caramel */
+  background-color: #fffaf3; /* Cream */
+  color: #264a42; /* Dark green */
+  margin-bottom: 1.5rem;
+}
+
+/* Add Item Section */
+.add-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.add-item input {
+  padding: 0.6rem 0.9rem;
+  font-size: 1rem;
+  border-radius: 6px;
+  border: 1.5px solid #c4832d; /* Warm caramel */
+  background: #fffaf3; /* Cream */
+  color: #264a42; /* Dark green */
+  flex: 1 1 160px;
+}
+
+.add-item button {
+  padding: 0.6rem 1.4rem;
+  background-color: #c4832d; /* Warm caramel */
+  color: #fffaf3; /* Cream */
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s ease-in-out;
+}
+
+.add-item button:hover {
+  background-color: #843c0c; /* Dark caramel */
+}
+
+/* Grocery List Items */
+.grocery-list ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.grocery-item {
+  background-color: #264a42; /* Dark green */
+  border: 2px solid #c4832d; /* Warm caramel */
+  color: #f4b25b; /* Light caramel */
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.grocery-item button.remove-item {
+  background-color: #c4832d; /* Warm caramel */
+  color: #fffaf3; /* Cream */
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.grocery-item button.remove-item:hover {
+  background-color: #843c0c; /* Dark caramel */
+}
+
+/* Empty State */
+.grocery-list p {
+  color: #6a7370; /* Muted gray */
+  font-style: italic;
+  font-weight: 500;
+}

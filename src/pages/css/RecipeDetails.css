@@ -1,0 +1,105 @@
+.recipe-details {
+  max-width: 800px;
+  margin: 2.5rem auto;
+  padding: 1.5rem;
+  background-color: #264231; /* Deep green */
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: 'Arial', sans-serif;
+  color: #f9f4ef; /* Creamy light text */
+}
+
+.recipe-details h1 {
+  margin-top: 5rem;
+  font-size: 2.5rem;
+  color: #f9f4ef;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.recipe-details p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+  color: #d8cfc9; /* Soft beige */
+}
+
+.recipe-details strong {
+  color: #f9f4ef;
+}
+
+.recipe-details h2 {
+  font-size: 1.8rem;
+  color: #f9f4ef;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #bc8455; /* Caramel line */
+  padding-bottom: 0.5rem;
+}
+
+.recipe-details ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.recipe-details ul li {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: #f9f4ef;
+}
+
+.recipe-details img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 2rem auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+.recipe-details .loading,
+.recipe-details .not-found {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #d8cfc9;
+  margin-top: 2rem;
+}
+
+.back-button {
+  float: left;
+  margin-top: .1rem;
+  padding: 0.8rem 1.5rem;
+  background-color: #bc8455; /* Caramel */
+  color: #fffefb;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+}
+
+.back-button:hover {
+  background-color: #915f2f; /* Darker caramel */
+  color: #fffefb;
+}
+
+.delete-button {
+  display: inline-block;
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.5rem;
+  background-color: #95382f; /* Earthy red */
+  color: #fffefb;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+}
+
+.delete-button:hover {
+  background-color: #70291f;
+  color: #fffefb;
+}

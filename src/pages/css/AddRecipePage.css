@@ -1,0 +1,158 @@
+.add-recipe-page-wrapper {
+  min-height: 100vh;
+  background: #fdf6f1;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.add-recipe-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2.5rem 3rem 1.5rem 3rem;
+  border-bottom: 2px solid #c4832d;
+  background: #fdf6f1;
+}
+
+.add-recipe-header h1 {
+  font-size: 2.2rem;
+  color: #264a42;
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.add-recipe-cancel-btn {
+  background: transparent;
+  color: #c4832d;
+  border: 2px solid #c4832d;
+  border-radius: 6px;
+  padding: 0.6rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+.add-recipe-cancel-btn:hover {
+  background: #c4832d;
+  color: #fffaf3;
+}
+
+.add-recipe-form-page {
+  max-width: 900px;
+  margin: 2.5rem auto;
+  background: #f1e8e2;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(38, 74, 66, 0.13);
+  padding: 2.5rem 2.5rem 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.add-recipe-form-main {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.add-recipe-form-section {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.add-recipe-form-section label {
+  color: #c4832d;
+  font-size: 1.08rem;
+  margin-bottom: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-weight: 600;
+}
+
+.add-recipe-form-section input,
+.add-recipe-form-section textarea {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 1.5px solid #c4832d;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fffaf3;
+  color: #264a42;
+  margin-top: 0.3rem;
+  transition: border 0.2s;
+  resize: vertical;
+}
+
+.add-recipe-form-section input:focus,
+.add-recipe-form-section textarea:focus {
+  border: 1.5px solid #38bdf8;
+  outline: none;
+}
+
+.ingredient-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.add-ingredient-btn {
+  background: #c4832d;
+  color: #fffaf3;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.add-ingredient-btn:hover {
+  background: #843c0c;
+}
+
+.remove-ingredient-btn {
+  background: transparent;
+  color: #c4832d;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  margin-left: 0.2rem;
+  transition: color 0.2s;
+}
+.remove-ingredient-btn:hover {
+  color: #843c0c;
+}
+
+.add-recipe-submit-btn {
+  background-color: #c4832d;
+  color: #fffaf3;
+  border: none;
+  border-radius: 6px;
+  padding: 1rem 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  box-shadow: 0 2px 8px rgba(196, 131, 45, 0.10);
+}
+.add-recipe-submit-btn:hover {
+  background-color: #843c0c;
+  color: #fffaf3;
+}
+
+@media (max-width: 950px) {
+  .add-recipe-form-main {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .add-recipe-form-page {
+    padding: 1.5rem 1rem;
+  }
+  .add-recipe-header {
+    padding: 2rem 1rem 1.2rem 1rem;
+  }
+}

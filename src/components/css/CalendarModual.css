@@ -1,0 +1,105 @@
+.calendar-modual {
+  width: 50%;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: 'Arial', sans-serif;
+  color: #333;
+}
+
+.calendar-modual h1 {
+  text-align: center;
+  color: #2c3e50;
+}
+
+.calendar-info {
+  margin-top: 1.5rem;
+}
+
+.calendar-info h2 {
+  font-size: 1.5rem;
+  color: #34495e;
+  margin-bottom: 1rem;
+}
+
+.calendar-info ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.calendar-info ul li {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.add-event-button {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fff;
+  background-color: #3498db;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.add-event-button:hover {
+  background-color: #2980b9;
+}
+
+.week-view-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1rem;
+  width: 100%;
+  margin: 2rem auto;
+}
+
+.day-box {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.day-box h2 {
+  font-size: 1.5rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.day-box ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.day-box ul li {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: #34495e;
+}
+
+.add-event-button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fff;
+  background-color: #3498db;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.add-event-button:hover {
+  background-color: #2980b9;
+}

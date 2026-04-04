@@ -1,0 +1,30 @@
+.login-register-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+  width: 100%;
+}
+
+.login-register-form label {
+  color: #6ee7b7;
+  font-size: 1.08rem;
+  margin-bottom: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.login-register-message {
+  margin-top: 1rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.login-register-message.error {
+  color: salmon;
+}
+
+.login-register-message.success {
+  color: #6ee7b7;
+}

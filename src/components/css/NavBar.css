@@ -1,0 +1,69 @@
+/* NavBar Component - Uses Global Design System */
+
+.header {
+  background-color: var(--color-white);
+  border-bottom: 1px solid var(--color-gray-200);
+  padding: var(--spacing-lg) 0;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+}
+
+.logo {
+  font-size: var(--font-size-2xl);
+  color: var(--color-gray-900);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Navbar section */
+.navbar {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-md);
+}
+
+.navbar-list {
+  list-style: none;
+  display: flex;
+  gap: var(--spacing-xl);
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-item a {
+  color: var(--color-gray-700);
+  font-size: var(--font-size-base);
+  text-decoration: none;
+  transition: color var(--transition-base);
+  position: relative;
+  font-weight: var(--font-weight-medium);
+}
+
+.navbar-item a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--transition-base);
+}
+
+.navbar-item a:hover {
+  color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.navbar-item a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
