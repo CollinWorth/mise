@@ -1,182 +1,135 @@
 .day-planner {
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 2rem 2.5rem;
-  background-color: #f1e8e2; /* Soft cream */
-  border-radius: 16px;
-  box-shadow: 0 4px 18px rgba(38, 74, 66, 0.13);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #264a42;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
+/* Day tabs */
 .day-selector {
   display: flex;
-  justify-content: center;
-  gap: 0.7rem;
-  margin-bottom: 2rem;
+  gap: var(--space-1);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1);
+  overflow-x: auto;
 }
 
 .day-button {
-  padding: 0.7rem 1.3rem;
-  font-size: 1rem;
+  flex: 1;
+  min-width: 70px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
   font-weight: 600;
-  color: #c4832d;
-  background-color: #fffaf3;
-  border: 2px solid #c4832d;
-  border-radius: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border 0.2s;
+  transition: all var(--transition);
+  text-align: center;
+}
+.day-button:hover { color: var(--text-primary); background: var(--bg); }
+.day-button.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(232,98,42,0.25);
 }
 
-.day-button.active,
-.day-button:focus {
-  background-color: #c4832d;
-  color: #fffaf3;
-  border: 2px solid #c4832d;
-}
-
-.day-button:hover {
-  background-color: #f4b25b;
-  color: #264a42;
-  border: 2px solid #f4b25b;
-}
-
+/* Drop zone */
 .day-recipes {
-  margin-bottom: 2rem;
-  padding: 1.5rem 1rem;
-  background-color: #264a42; /* Deep green */
-  border-radius: 14px;
-  border: 2px solid #c4832d; /* Caramel border */
-  min-height: 150px;
-  box-shadow: 0 2px 12px rgba(38, 74, 66, 0.10);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  min-height: 160px;
+  transition: border-color var(--transition), background var(--transition);
 }
-
+.day-recipes:hover {
+  border-color: var(--border-strong);
+}
 .day-recipes h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: #f4b25b; /* Caramel */
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-4);
 }
-
-.day-recipes ul {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
+.day-recipes ul { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
 
 .recipe-item {
-  background: #f1e8e2;
-  border: 1.5px solid #c4832d;
-  border-radius: 10px;
-  margin-bottom: 0.7rem;
-  padding: 0.7rem 1rem;
   display: flex;
   align-items: center;
-  gap: 1.2rem;
-  box-shadow: 0 2px 8px rgba(196, 131, 45, 0.08);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
-
-.recipe-item img {
-  width: 70px;
-  height: 70px;
-  object-fit: cover;
-  border-radius: 7px;
-  border: 1.5px solid #f4b25b;
+.recipe-item img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.recipe-name { font-size: var(--text-sm); font-weight: 500; color: var(--text-primary); flex: 1; }
+.recipe-cuisine {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
 }
-
-.recipe-name {
-  font-weight: bold;
-  color: #c4832d;
-  font-size: 1.1rem;
-}
-
-.recipe-cuisine,
-.recipe-tags {
-  font-size: 0.98em;
-  color: #264a42;
-  margin-left: 0.5em;
-}
-
 .remove-recipe {
-  margin-left: auto;
-  padding: 0.4rem 1rem;
-  font-size: 1rem;
-  background-color: #c4832d;
-  color: #fffaf3;
+  background: transparent;
   border: none;
-  border-radius: 6px;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  transition: background 0.2s;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
 }
-.remove-recipe:hover {
-  background-color: #843c0c;
-}
+.remove-recipe:hover { color: var(--error); background: #FFF5F5; }
 
 .empty-drop-zone {
-  color: #f4b25b;
-  font-style: italic;
-  font-weight: 500;
-  text-align: center;
-  margin: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
-/* Search Section */
-.search-bar {
-  margin-top: 2rem;
-  margin-bottom: 1.5rem;
-}
-
-.search-bar h2 {
-  color: #c4832d;
-  font-size: 1.2rem;
-  margin-bottom: 0.7rem;
+/* Search/drag section */
+.planner-search { display: flex; flex-direction: column; gap: var(--space-4); }
+.planner-search h2 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .search-results {
   list-style: none;
-  padding: 0;
-  margin: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: flex-start;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .search-item {
   display: flex;
   align-items: center;
-  background: #fffaf3;
-  border: 1.5px solid #c4832d;
-  border-radius: 8px;
-  padding: 0.7rem 1rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
   cursor: grab;
-  transition: background 0.2s, border 0.2s;
-  gap: 0.7rem;
-  min-width: 220px;
+  transition: all var(--transition);
+  user-select: none;
 }
-
 .search-item:hover {
-  background-color: #f4b25b;
-  border-color: #f4b25b;
-  color: #264a42;
+  border-color: var(--accent);
+  background: var(--accent-light);
 }
-
-.search-item img {
-  width: 50px;
-  height: 50px;
-  border-radius: 5px;
-  margin-right: 10px;
-  border: 1.5px solid #c4832d;
-}
-
-@media (max-width: 700px) {
-  .day-planner {
-    padding: 1rem 0.5rem;
-  }
-  .day-recipes {
-    padding: 1rem 0.5rem;
-  }
-  .search-results {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-}
+.search-item:active { cursor: grabbing; }
+.search-item img { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }

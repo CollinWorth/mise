@@ -1,20 +1,14 @@
 import React from 'react';
-import './css/SearchBar.css';
 
 function SearchBar({ onSearch }) {
-  const handleInputChange = (e) => {
-    onSearch(e.target.value);
-  };
-
   return (
-    <div className="search-bar">
-      <input
-        type="text"
-        placeholder="Search recipes..."
-        onChange={handleInputChange}
-        className="search-input"
-      />
-    </div>
-    );
+    <input
+      type="search"
+      placeholder="Search recipes..."
+      onChange={(e) => onSearch(e.target.value)}
+      style={{ width: '100%' }}
+    />
+  );
 }
+
 export default SearchBar;

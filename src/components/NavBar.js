@@ -1,28 +1,45 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './css/NavBar.css';
 
-function NavBar({ user }) {
+function NavBar({ user, onLogout }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    onLogout();
+    navigate('/login');
+  };
+
   return (
-    <header className="header">
-      <div className="header-top">
-        <div className="logo">
-          🥕 Harvest Pantry
+    <nav className="nav">
+      <div className="nav-inner">
+        <Link to="/" className="nav-logo">mise</Link>
+        <div className="nav-links">
+          {user && <NavLink to="/recipes" current={location.pathname}>Recipes</NavLink>}
+          {user && <NavLink to="/calendar" current={location.pathname}>Planner</NavLink>}
+          {user && <NavLink to="/grocery-list" current={location.pathname}>Grocery</NavLink>}
+          {!user && <NavLink to="/login" current={location.pathname}>Login</NavLink>}
+          {!user && <NavLink to="/register" current={location.pathname}>Register</NavLink>}
+          {user && (
+            <>
+              <div className="nav-divider" />
+              <span className="nav-user">{user.name?.split(' ')[0]}</span>
+              <button className="nav-logout" onClick={handleLogout}>Sign out</button>
+            </>
+          )}
         </div>
       </div>
+    </nav>
+  );
+}
 
-      <nav className="navbar">
-        <ul className="navbar-list">
-          <li className="navbar-item"><Link to="/">Home</Link></li>
-          {user && <li className="navbar-item"><Link to="/calendar">Calendar</Link></li>}
-          {user && <li className="navbar-item"><Link to="/recipes">Recipes</Link></li>}
-          {user && <li className="navbar-item"><Link to="/grocery-list">Grocery List</Link></li>}
-          <li className="navbar-item"><Link to="/contact">Contact</Link></li>
-          {!user && <li className="navbar-item"><Link to="/login">Login</Link></li>}
-          {!user && <li className="navbar-item"><Link to="/register">Register</Link></li>}
-        </ul>
-      </nav>
-    </header>
+function NavLink({ to, current, children }) {
+  const active = current === to || (to !== '/' && current.startsWith(to));
+  return (
+    <Link to={to} className={`nav-link${active ? ' nav-link--active' : ''}`}>
+      {children}
+    </Link>
   );
 }
 

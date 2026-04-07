@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { apiFetch } from '../api';
 import './css/Login_Register.css';
 
 function Login({ onLogin }) {
@@ -7,23 +8,20 @@ function Login({ onLogin }) {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const response = await fetch('http://localhost:8000/users/login', {
+      const response = await apiFetch('/users/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       if (response.ok) {
-        const user = await response.json();
-        if (onLogin) onLogin(user);
-        navigate('/'); // Redirect to home
+        const data = await response.json();
+        onLogin(data.access_token, data.user);
+        navigate('/');
       } else {
         const data = await response.json();
         setError(data.detail || 'Invalid email or password');
@@ -34,32 +32,26 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div className="container" style={{ maxWidth: 400, margin: '48px auto' }}>
-      <h1>Login</h1>
-      <form className="login-register-form" onSubmit={handleSubmit}>
-        <label>
-          Email:
-          <input
-            type="email"
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <label>
-          Password:
-          <input
-            type="password"
-            name="password"
-            value={form.password}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-      {error && <div className="login-register-message error">{error}</div>}
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h1>Welcome back</h1>
+        <p className="auth-subtitle">Sign in to your mise account</p>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label>
+            Email
+            <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="you@example.com" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" value={form.password} onChange={handleChange} placeholder="••••••••" required />
+          </label>
+          <button type="submit">Sign in</button>
+        </form>
+        {error && <p className="auth-error">{error}</p>}
+        <p className="auth-footer">
+          No account? <Link to="/register">Create one</Link>
+        </p>
+      </div>
     </div>
   );
 }
