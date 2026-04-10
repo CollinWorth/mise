@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/recipe.dart';
 
 // ── In-memory cook state ─────────────────────────────────────────────────────
@@ -75,6 +76,14 @@ class CookModeScreen extends StatefulWidget {
 
 class _CookModeScreenState extends State<CookModeScreen> {
   String get _id => widget.recipe.id;
+  bool _keepAwake = false;
+  bool _showQtyHints = false;
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +124,12 @@ class _CookModeScreenState extends State<CookModeScreen> {
                         .toList()
                         .asMap()
                         .entries
-                        .map((e) => _StepRow(step: e.value.trim(), index: e.key + 1)),
+                        .map((e) => _StepRow(
+                          step: e.value.trim(),
+                          index: e.key + 1,
+                          ingredients: _showQtyHints ? widget.recipe.ingredients : null,
+                          multiplier: mult,
+                        )),
                   ],
                 ],
               ),
@@ -180,6 +194,29 @@ class _CookModeScreenState extends State<CookModeScreen> {
                   ),
                 ),
               ],
+              const SizedBox(width: 4),
+              _toggleBtn(
+                icon: _keepAwake ? Icons.coffee : Icons.coffee_outlined,
+                active: _keepAwake,
+                activeColor: const Color(0xFFE8622A),
+                chipBg: chipBg,
+                iconColor: iconColor,
+                tooltip: _keepAwake ? 'Screen stays on' : 'Keep screen on',
+                onTap: () {
+                  setState(() => _keepAwake = !_keepAwake);
+                  if (_keepAwake) WakelockPlus.enable(); else WakelockPlus.disable();
+                },
+              ),
+              const SizedBox(width: 6),
+              _toggleBtn(
+                icon: _showQtyHints ? Icons.tips_and_updates : Icons.tips_and_updates_outlined,
+                active: _showQtyHints,
+                activeColor: const Color(0xFF4A7EC7),
+                chipBg: chipBg,
+                iconColor: iconColor,
+                tooltip: _showQtyHints ? 'Hide qty hints' : 'Show qty hints in steps',
+                onTap: () => setState(() => _showQtyHints = !_showQtyHints),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -220,6 +257,33 @@ class _CookModeScreenState extends State<CookModeScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _toggleBtn({
+    required IconData icon,
+    required bool active,
+    required Color activeColor,
+    required Color chipBg,
+    required Color iconColor,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: active ? activeColor.withOpacity(0.15) : chipBg,
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: active ? activeColor.withOpacity(0.5) : Colors.transparent),
+          ),
+          child: Icon(icon, size: 18, color: active ? activeColor : iconColor),
+        ),
       ),
     );
   }
@@ -329,25 +393,47 @@ class _IngredientRow extends StatelessWidget {
 class _StepRow extends StatelessWidget {
   final String step;
   final int index;
-  const _StepRow({required this.step, required this.index});
+  final List<Ingredient>? ingredients;
+  final int multiplier;
+
+  const _StepRow({
+    required this.step,
+    required this.index,
+    this.ingredients,
+    this.multiplier = 1,
+  });
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+
+    final hints = ingredients?.where((ing) {
+      if (ing.name.trim().isEmpty) return false;
+      return step.toLowerCase().contains(ing.name.trim().toLowerCase());
+    }).toList() ?? [];
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 28, height: 28,
-            decoration: BoxDecoration(
-              color: dark ? const Color(0xFF2C2C2A) : const Color(0xFFECEAE6),
-              borderRadius: BorderRadius.circular(99),
-            ),
-            child: Center(
-              child: Text('$index', style: const TextStyle(color: Color(0xFFE8622A), fontSize: 13, fontWeight: FontWeight.w700)),
-            ),
+          Column(
+            children: [
+              Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF2C2C2A) : const Color(0xFFECEAE6),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Center(
+                  child: Text('$index', style: const TextStyle(color: Color(0xFFE8622A), fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+              ),
+              if (hints.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                for (final ing in hints) _qtyBadge(ing),
+              ],
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -357,6 +443,24 @@ class _StepRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _qtyBadge(Ingredient ing) {
+    final qty = multiplyQty(ing.quantity, multiplier);
+    final label = [qty, ing.unit].where((s) => s.isNotEmpty).join(' ');
+    if (label.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8622A).withOpacity(0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE8622A).withOpacity(0.35)),
+        ),
+        child: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFE8622A))),
       ),
     );
   }

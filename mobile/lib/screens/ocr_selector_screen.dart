@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/vision_ocr.dart';
 
 enum _Label { none, title, ingredients, instructions }
@@ -28,41 +29,107 @@ class _OcrSelectorScreenState extends State<OcrSelectorScreen> {
   static const _kIng   = Color(0xFF2D9D5C);
   static const _kInst  = Color(0xFF4A7EC7);
 
+  static final _kIngHeaderRe  = RegExp(r'^ingredients?[\s:]*$', caseSensitive: false);
+  static final _kInstHeaderRe = RegExp(r'^(directions?|instructions?|method|steps?|preparation)[\s:]*$', caseSensitive: false);
+  static final _kAnyHeaderRe  = RegExp(r'^(ingredients?|directions?|instructions?|method|steps?|preparation)[\s:]*$', caseSensitive: false);
+  static final _kQtyRe = RegExp(
+    r'^[\d¼½¾⅓⅔⅛⅜⅝⅞][\d\s\/\.]*\s*'
+    r'(?:cup|cups|tbsp|tsp|tablespoon|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|'
+    r'liter|litre|clove|cloves|can|cans|bunch|sprig|pinch|dash|piece|pieces|'
+    r'large|medium|small|head|slice|slices|stalk|package|C|T|t)\b',
+    caseSensitive: false,
+  );
+
   @override
   void initState() {
     super.initState();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _ordered = widget.ocr.ordered;
-    _labels  = List.generate(_ordered.length, (i) => _autoLabel(_ordered[i], i));
+    _labels  = List.filled(_ordered.length, _Label.none);
+    _autoLabelAll();
   }
 
-  _Label _autoLabel(OcrLine line, int idx) {
-    final t = line.text.trim();
-    if (t.isEmpty) return _Label.none;
+  @override
+  void dispose() {
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    super.dispose();
+  }
 
-    // Section headers
-    if (RegExp(r'^(ingredients?|directions?|instructions?|method|steps?)[\s:]*$',
-        caseSensitive: false).hasMatch(t)) return _Label.none; // skip headers
+  static final _kBulletRe = RegExp(r'^[•\-\*]\s*');
+  static final _kSubheadRe = RegExp(r'^[A-Z][^:]{2,40}:\s*$'); // "Slow Roasted Tomatoes:"
 
-    // Numbered step
-    if (RegExp(r'^\d+[.)]\s+[A-Za-z]').hasMatch(t)) return _Label.instructions;
-
-    // Starts with quantity + unit → ingredient
-    if (RegExp(
-      r'^[\d¼½¾⅓⅔⅛⅜⅝⅞][\d\s\/\.]*\s*'
-      r'(?:cup|cups|tbsp|tsp|tablespoon|teaspoon|oz|ounce|lb|pound|g|gram|kg|ml|'
-      r'liter|litre|clove|cloves|can|cans|bunch|sprig|pinch|dash|piece|pieces|'
-      r'large|medium|small|head|slice|slices|stalk|package|C|T|t)\b',
-      caseSensitive: false,
-    ).hasMatch(t)) return _Label.ingredients;
-
-    // Long prose → instruction
-    if (t.length > 60 && RegExp(r'[a-z]').hasMatch(t)) return _Label.instructions;
-
-    // Short title-like line in first column, near top
-    if (idx < 4 && t.split(' ').length <= 6 && !RegExp(r'^\d').hasMatch(t)) {
-      return _Label.title;
+  void _autoLabelAll() {
+    // ── Pass 1: section-header scan ──────────────────────────────────
+    // If the OCR text contains explicit section headers ("Ingredients", "Directions"),
+    // everything after a header inherits that section's label until the next header.
+    bool foundAnyHeader = false;
+    _Label current = _Label.none;
+    for (int i = 0; i < _ordered.length; i++) {
+      final t = _ordered[i].text.trim();
+      if (t.isEmpty) continue;
+      if (_kIngHeaderRe.hasMatch(t)) {
+        current = _Label.ingredients; foundAnyHeader = true;
+        _labels[i] = _Label.none; // header itself not included in output
+        continue;
+      }
+      if (_kInstHeaderRe.hasMatch(t)) {
+        current = _Label.instructions; foundAnyHeader = true;
+        _labels[i] = _Label.none;
+        continue;
+      }
+      // Title: short unlabeled line before the first header
+      if (!foundAnyHeader && t.split(' ').length <= 8 &&
+          !RegExp(r'^\d').hasMatch(t) && t.length < 70) {
+        _labels[i] = _Label.title;
+        continue;
+      }
+      _labels[i] = current;
     }
-    return _Label.none;
+
+    if (foundAnyHeader) return; // header-based labels are good enough
+
+    // ── Pass 2: per-line heuristics (headerless / bullet-list recipes) ──
+    for (int i = 0; i < _ordered.length; i++) {
+      final raw = _ordered[i].text.trim();
+      if (raw.isEmpty) continue;
+      // Strip leading bullet chars before matching
+      final t = raw.replaceFirst(_kBulletRe, '').trim();
+      if (t.isEmpty) { _labels[i] = _Label.none; continue; } // lone bullet
+      if (_kAnyHeaderRe.hasMatch(t)) { _labels[i] = _Label.none; continue; }
+      // Sub-section header ("Slow Roasted Tomatoes:") — skip, don't propagate
+      if (_kSubheadRe.hasMatch(raw)) { _labels[i] = _Label.none; continue; }
+      if (RegExp(r'^\d+[.)]\s+[A-Za-z]').hasMatch(t)) { _labels[i] = _Label.instructions; continue; }
+      if (_kQtyRe.hasMatch(t)) { _labels[i] = _Label.ingredients; continue; }
+      if (t.length > 80 && RegExp(r'[a-z]').hasMatch(t)) { _labels[i] = _Label.instructions; continue; }
+      if (i < 4 && t.split(' ').length <= 6 && !RegExp(r'^\d').hasMatch(t)) {
+        _labels[i] = _Label.title; continue;
+      }
+    }
+
+    // ── Pass 3: propagate — pull unlabeled lines into neighboring section ──
+    // Handles continuation lines ("Modena") and no-qty ingredients ("Salt & pepper to taste").
+    // Does NOT propagate into sub-section headers (they end with ':').
+    for (int i = 0; i < _ordered.length; i++) {
+      if (_labels[i] != _Label.none) continue;
+      final raw = _ordered[i].text.trim();
+      if (raw.isEmpty) continue;
+      if (_kSubheadRe.hasMatch(raw)) continue; // keep sub-headers unlabeled
+      // Find nearest labeled non-empty line before and after
+      _Label prev = _Label.none;
+      for (int j = i - 1; j >= 0; j--) {
+        if (_ordered[j].text.trim().isEmpty) continue;
+        if (_labels[j] != _Label.none) { prev = _labels[j]; break; }
+      }
+      _Label next = _Label.none;
+      for (int j = i + 1; j < _ordered.length; j++) {
+        if (_ordered[j].text.trim().isEmpty) continue;
+        if (_labels[j] != _Label.none) { next = _labels[j]; break; }
+      }
+      // Inherit if both neighbors agree, or if only one side is labeled
+      if (prev == next && prev != _Label.none) { _labels[i] = prev; continue; }
+      if (prev == _Label.ingredients || next == _Label.ingredients) _labels[i] = _Label.ingredients;
+      if (prev == _Label.instructions || next == _Label.instructions) _labels[i] = _Label.instructions;
+    }
   }
 
   void _tapLine(int i) {
@@ -83,7 +150,10 @@ class _OcrSelectorScreenState extends State<OcrSelectorScreen> {
     final ingLines   = <String>[];
     final instLines  = <String>[];
     for (int i = 0; i < _ordered.length; i++) {
-      final t = _ordered[i].text.trim();
+      final raw = _ordered[i].text.trim();
+      if (raw.isEmpty) continue;
+      // Strip bullets; skip lines that are just a bullet char
+      final t = raw.replaceFirst(_kBulletRe, '').trim();
       if (t.isEmpty) continue;
       switch (_labels[i]) {
         case _Label.title:        titleParts.add(t);
@@ -167,7 +237,7 @@ class _OcrSelectorScreenState extends State<OcrSelectorScreen> {
           Expanded(
             child: isMultiCol
               ? _buildMultiColumn()
-              : _buildSingleColumn(_ordered, showHeader: false),
+              : SingleChildScrollView(child: _buildSingleColumn(_ordered, showHeader: false)),
           ),
 
           // ── Use button ───────────────────────────────────────────────
@@ -213,36 +283,46 @@ class _OcrSelectorScreenState extends State<OcrSelectorScreen> {
   }
 
   Widget _columnHeader(int idx, List<OcrLine> colLines) {
-    final label = idx == 0 ? 'Left column' : 'Right column';
+    final colLabel = idx == 0 ? 'Left column' : 'Right column';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-              color: Color(0xFF888480), letterSpacing: 0.5)),
-          const SizedBox(width: 8),
-          const Expanded(child: Divider()),
-          const SizedBox(width: 8),
-          // Quick-label buttons for the whole column
-          for (final lbl in [_Label.title, _Label.ingredients, _Label.instructions])
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: GestureDetector(
-                onTap: () => _labelColumn(colLines, lbl),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _color(lbl)!.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: _color(lbl)!.withOpacity(0.4)),
+          Row(children: [
+            Text(colLabel.toUpperCase(),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                color: Color(0xFF888480), letterSpacing: 1.0)),
+            const SizedBox(width: 8),
+            const Expanded(child: Divider()),
+          ]),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Label all as:',
+                style: TextStyle(fontSize: 12, color: Color(0xFF888480))),
+              const SizedBox(width: 8),
+              // Quick-label buttons for the whole column
+              for (final lbl in [_Label.title, _Label.ingredients, _Label.instructions])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () => _labelColumn(colLines, lbl),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: _color(lbl)!.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _color(lbl)!.withOpacity(0.5), width: 1.5),
+                      ),
+                      child: Text(_labelName(lbl),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                          color: _color(lbl))),
+                    ),
                   ),
-                  child: Text(_labelName(lbl),
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                      color: _color(lbl))),
                 ),
-              ),
-            ),
+            ],
+          ),
         ],
       ),
     );
@@ -262,40 +342,46 @@ class _OcrSelectorScreenState extends State<OcrSelectorScreen> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: isLabeled ? color!.withOpacity(0.08) : Colors.white,
               borderRadius: BorderRadius.circular(8),
-              border: Border(
-                left: BorderSide(color: isLabeled ? color! : const Color(0xFFE5E2DC), width: isLabeled ? 4 : 1.5),
-                top:    BorderSide(color: isLabeled ? color!.withOpacity(0.25) : const Color(0xFFE5E2DC)),
-                right:  BorderSide(color: isLabeled ? color!.withOpacity(0.25) : const Color(0xFFE5E2DC)),
-                bottom: BorderSide(color: isLabeled ? color!.withOpacity(0.25) : const Color(0xFFE5E2DC)),
+              border: Border.all(
+                color: isLabeled ? color!.withOpacity(0.35) : const Color(0xFFE5E2DC),
+                width: 1.5,
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(children: [
-                Expanded(
-                  child: Text(line.text,
-                    style: TextStyle(
-                      fontSize: 13, height: 1.4,
-                      color: isLabeled ? color!.withOpacity(0.85) : const Color(0xFF3A3836),
-                      fontWeight: isLabeled ? FontWeight.w600 : FontWeight.w400,
-                    )),
-                ),
-                if (isLabeled) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: color!.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(5),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(isLabeled ? 12 : 12, 8, 12, 8),
+                  child: Row(children: [
+                    Expanded(
+                      child: Text(line.text,
+                        style: TextStyle(
+                          fontSize: 13, height: 1.4,
+                          color: isLabeled ? color!.withOpacity(0.85) : const Color(0xFF3A3836),
+                          fontWeight: isLabeled ? FontWeight.w600 : FontWeight.w400,
+                        )),
                     ),
-                    child: Text(_labelName(label),
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-                  ),
-                ],
-              ]),
+                    if (isLabeled) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color!.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(_labelName(label),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                      ),
+                    ],
+                  ]),
+                ),
+                if (isLabeled)
+                  Positioned(left: 0, top: 0, bottom: 0,
+                    child: Container(width: 4, color: color)),
+              ],
             ),
           ),
         );

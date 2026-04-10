@@ -3,6 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../api';
 import './css/AddRecipePage.css';
 
+const SUGGESTED_CATEGORIES = [
+  'Soup','Stew','Chili','Salad','Bowl','Pasta','Rice','Curry','Stir-fry',
+  'Tacos','Burger','Pizza','Sandwich','Wrap','Roast','Grilled','Seafood',
+  'Breakfast','Brunch','Eggs','Pancakes','Oatmeal','Smoothie',
+  'Snack','Appetizer','Side dish','Dip','Bread','Cake','Cookies',
+  'Muffins','Pie','Dessert','Drink',
+];
+
+const SUGGESTED_TAGS = [
+  'quick','easy','healthy','vegetarian','vegan','gluten-free',
+  'dairy-free','spicy','meal prep','high-protein','low-carb',
+  'keto','comfort food','weeknight','kid-friendly','budget-friendly',
+];
+
 function EditRecipe({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -10,6 +24,7 @@ function EditRecipe({ user }) {
   const [ingredients, setIngredients] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
     apiFetch(`/recipes/${id}`)
@@ -22,8 +37,9 @@ function EditRecipe({ user }) {
           prep_time: recipe.prep_time ?? '',
           cook_time: recipe.cook_time ?? '',
           servings: recipe.servings ?? '',
-          cuisine: recipe.cuisine || '',
-          tags: recipe.tags || '',
+          cuisine:  recipe.cuisine  || '',
+          category: recipe.category || '',
+          tags:     recipe.tags     || '',
           image_url: recipe.image_url || '',
           user_id: recipe.user_id || user?.id || user?._id || '',
         });
@@ -70,6 +86,14 @@ function EditRecipe({ user }) {
     setSubmitting(false);
   };
 
+  const currentTags = form?.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const addTag = tag => {
+    const t = tag.trim().toLowerCase();
+    if (!t || currentTags.map(x => x.toLowerCase()).includes(t)) return;
+    setForm(f => ({ ...f, tags: [...currentTags, t].join(', ') }));
+  };
+  const removeTag = tag => setForm(f => ({ ...f, tags: currentTags.filter(t => t !== tag).join(', ') }));
+
   if (loading) return <div className="page"><p>Loading…</p></div>;
 
   return (
@@ -89,14 +113,63 @@ function EditRecipe({ user }) {
             Cuisine
             <input type="text" name="cuisine" value={form.cuisine} onChange={handleChange} />
           </label>
-          <label>
+          <div style={{display:'flex',flexDirection:'column',gap:'var(--space-2)',fontSize:'var(--text-xs)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase',color:'var(--text-secondary)',gridColumn:'1/-1'}}>
+            Category
+            <div className="ar-tag-suggestions">
+              {SUGGESTED_CATEGORIES.map(cat => (
+                <button key={cat} type="button"
+                  className={`ar-tag-suggest${form.category === cat ? ' ar-tag-suggest--active' : ''}`}
+                  onClick={() => setForm(f => ({ ...f, category: f.category === cat ? '' : cat }))}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <input type="text" value={form.category || ''} onChange={e => setForm(f => ({...f, category: e.target.value}))} placeholder="Or type a custom category…" style={{textTransform:'none',letterSpacing:'normal',fontSize:'var(--text-sm)',fontWeight:'normal'}} />
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'var(--space-2)',fontSize:'var(--text-xs)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase',color:'var(--text-secondary)'}}>
             Tags
-            <input type="text" name="tags" value={form.tags} onChange={handleChange} placeholder="comma separated" />
-          </label>
+            <div className="ar-tag-suggestions">
+              {SUGGESTED_TAGS.filter(t => !currentTags.map(x => x.toLowerCase()).includes(t)).map(t => (
+                <button key={t} type="button" className="ar-tag-suggest" onClick={() => addTag(t)}>+ {t}</button>
+              ))}
+            </div>
+            <div className="ar-tag-input-row">
+              {currentTags.map(t => (
+                <span key={t} className="ar-tag-pill">
+                  {t}<button type="button" className="ar-tag-pill-remove" onClick={() => removeTag(t)}>×</button>
+                </span>
+              ))}
+              <input
+                type="text"
+                className="ar-tag-text-input"
+                placeholder={currentTags.length ? 'Add more…' : 'Type a tag…'}
+                value={tagInput}
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={e => {
+                  if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                    e.preventDefault(); addTag(tagInput); setTagInput('');
+                  }
+                }}
+              />
+            </div>
+          </div>
           <label>
             Image URL
             <input type="text" name="image_url" value={form.image_url} onChange={handleChange} />
           </label>
+          <div className="ar-label ar-col-2 ar-toggle-row" style={{gridColumn:'1/-1'}}>
+            <div>
+              <span className="ar-toggle-label">Share publicly</span>
+              <span className="ar-toggle-sub">Show this recipe on Explore for others to discover</span>
+            </div>
+            <button
+              type="button"
+              className={`ar-toggle${form.is_public ? ' ar-toggle--on' : ''}`}
+              onClick={() => setForm(f => ({ ...f, is_public: !f.is_public }))}
+              role="switch"
+              aria-checked={form.is_public}
+            />
+          </div>
           <label>
             Prep Time (min)
             <input type="number" name="prep_time" value={form.prep_time} onChange={handleChange} min="0" />

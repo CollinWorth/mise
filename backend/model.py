@@ -16,8 +16,11 @@ class Recipe(BaseModel):
     cook_time: Optional[int] = Field(default=None, title="Cooking Time in minutes")
     servings: Optional[int] = Field(default=None, title="Number of Servings")
     cuisine: Optional[str] = Field(default=None, title="Cuisine Type")
-    tags: Optional[str] = Field(default=None, title="Tags for the Recipe")
+    category: Optional[str] = Field(default=None, title="Dish category, e.g. Soup, Salad, Pasta")
+    tags: Optional[str] = Field(default=None, title="Attribute tags, e.g. quick, healthy, vegan")
     image_url: Optional[str] = Field(default=None, title="Image URL for the Recipe")
+    is_public: bool = False
+    like_count: int = 0
     user_id: str
 
 class GroceryItem(BaseModel):

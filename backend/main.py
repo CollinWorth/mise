@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from database import client, db
-from routers import users, recipes, mealPlans, groceryList
+from routers import users, recipes, mealPlans, groceryList, follows, comments
 
 app = FastAPI()
 
@@ -20,6 +20,8 @@ app.include_router(recipes.router, prefix="/recipes", tags=["recipes"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(mealPlans.router, prefix="/mealPlans", tags=["mealPlans"])
 app.include_router(groceryList.router, prefix="/groceryList", tags=["groceryList"])
+app.include_router(follows.router,     prefix="/follows",     tags=["follows"])
+app.include_router(comments.router,    prefix="/comments",    tags=["comments"])
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

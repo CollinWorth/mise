@@ -45,6 +45,8 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   final _urlCtrl = TextEditingController();
   final _rawTextCtrl = TextEditingController();
   bool _ocrLoading = false; // OCR is running (separate from server _importing)
+  String _category = '';
+  bool _isPublic = false;
 
   @override
   void initState() {
@@ -59,6 +61,8 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       _servingsCtrl.text = r.servings > 0 ? r.servings.toString() : '';
       _imageCtrl.text = r.imageUrl ?? '';
       _instructionsCtrl.text = r.instructions;
+      _category = r.category;
+      _isPublic = r.isPublic;
       _ingredients = r.ingredients.isNotEmpty
           ? r.ingredients.map((i) => {'name': i.name, 'quantity': i.quantity, 'unit': i.unit, '_id': '${_nextIngId++}'}).toList()
           : [{'name': '', 'quantity': '', 'unit': '', '_id': '0'}];
@@ -77,6 +81,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     _servingsCtrl.text = data['servings']?.toString() ?? '';
     _imageCtrl.text = data['image_url'] ?? '';
     _tagsCtrl.text = data['tags'] ?? '';
+    _category = data['category'] ?? _category;
     _instructionsCtrl.text = data['instructions'] ?? '';
     final ings = (data['ingredients'] as List? ?? []);
     if (ings.isNotEmpty) {
@@ -97,6 +102,15 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       final r = await Api.post('/recipes/scrape-smart', {'url': url});
       if (r.statusCode == 200) {
         final data = jsonDecode(r.body) as Map<String, dynamic>;
+        // TikTok: take the raw description through the OCR labeling flow
+        if (_mode == _ImportMode.tiktok && data['raw_text'] != null) {
+          setState(() => _importing = false);
+          await _labelTikTokDescription(
+            data['raw_text'] as String,
+            data['image_url'] as String? ?? '',
+          );
+          return;
+        }
         setState(() { _importedData = data; _fillForm(data); });
       } else {
         final body = jsonDecode(r.body);
@@ -107,6 +121,141 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     }
     setState(() => _importing = false);
   }
+
+  /// Split a TikTok description into OcrLines and open the same labeling
+  /// screen used for photo OCR so the user can tag title/ingredients/steps.
+  Future<void> _labelTikTokDescription(String description, String imageUrl) async {
+    final lines = _splitTikTokDescription(description);
+
+    if (lines.isEmpty) {
+      setState(() => _error = 'No text found in description.');
+      return;
+    }
+
+    // Build OcrResult with fake positional data (stacked top-to-bottom)
+    double y = 0.0;
+    const lineH = 0.05;
+    final ocrLines = lines.map((text) {
+      final line = OcrLine(text: text, x: 0.0, y: y, w: 1.0, h: lineH);
+      y += lineH + 0.01;
+      return line;
+    }).toList();
+    final ocr = OcrResult(lines: ocrLines, columns: [ocrLines]);
+
+    if (!mounted) return;
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    final selections = await Navigator.push<OcrSelections>(
+      context,
+      MaterialPageRoute(builder: (_) => OcrSelectorScreen(ocr: ocr)),
+    );
+    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+
+    if (selections != null && mounted) {
+      await _applyOcrSelections(selections);
+      // Set thumbnail after _applyOcrSelections so _fillForm doesn't overwrite it
+      if (imageUrl.isNotEmpty && mounted) {
+        setState(() => _imageCtrl.text = imageUrl);
+      }
+    }
+  }
+
+  /// Parse a raw TikTok description into individual lines for the labeling UI.
+  /// Handles both well-formatted descriptions (newline-separated) and single-blob
+  /// descriptions where everything runs together.
+  static List<String> _splitTikTokDescription(String raw) {
+    // Step 1: strip hashtags and @mentions (social noise, not recipe content)
+    String text = raw.replaceAll(RegExp(r'\s*#\w+'), '').replaceAll(RegExp(r'@\w+'), '').trim();
+
+    // Step 2: inject breaks before section headers (works on both blobs and multi-line)
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\n)\s*(INGREDIENTS?|INSTRUCTIONS?|DIRECTIONS?|STEPS?|METHOD|OPTIONAL\b[^:]*)\s*:', caseSensitive: false),
+      (m) => '\n${m.group(0)}',
+    );
+    // Before numbered steps: "1." "2." etc.
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\n)\s+(\d+[.)]\s+[A-Z])'),
+      (m) => '\n${m.group(1)}',
+    );
+    // Before bullet points: "•" "-" "·"
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\n)\s+([•·\-]\s+\S)'),
+      (m) => '\n${m.group(1)}',
+    );
+
+    // Step 3: split by newlines
+    final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+
+    // Step 4: split packed ingredient lines and long prose instruction paragraphs
+    final result = <String>[];
+    for (final line in lines) {
+      final packed = _splitPackedIngredients(line);
+      if (packed.length > 1) {
+        result.addAll(packed);
+      } else {
+        result.addAll(_splitSentences(line));
+      }
+    }
+    return result;
+  }
+
+  /// Split a long prose line into individual sentences.
+  /// Used for instruction paragraphs like "Preheat oven. Mix ingredients. Bake 30 min."
+  static List<String> _splitSentences(String line) {
+    if (line.length <= 80) return [line];
+    // Split on sentence-ending punctuation followed by space + capital letter
+    final sentences = line.split(RegExp(r'(?<=[.!?])\s+(?=[A-Z])'));
+    if (sentences.length > 1) {
+      return sentences.map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    }
+    return [line];
+  }
+
+  /// Split a line that has multiple ingredients crammed together, separated only
+  /// by the start of the next quantity. Paren-aware: won't split inside "(about 2)".
+  ///
+  /// Splits before: digits, unicode fractions, and unitless measure words
+  /// (Pinch, Dash, Handful, etc.) that aren't inside parentheses.
+  static List<String> _splitPackedIngredients(String line) {
+    final parts = <String>[];
+    int depth = 0;
+    int start = 0;
+
+    for (int i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (c == '(') { depth++; continue; }
+      if (c == ')') { depth = (depth - 1).clamp(0, 99); continue; }
+      if (depth > 0 || c != ' ') continue;
+
+      // We're at a space outside parens. Check if what follows starts a new ingredient.
+      final rest = line.substring(i + 1);
+      if (_startsIngredient(rest)) {
+        final part = line.substring(start, i).trim();
+        // Don't split if the current segment is just a number —
+        // it's the whole-number part of a mixed fraction like "2 1/2"
+        if (part.isNotEmpty && !_bareNumberRe.hasMatch(part)) {
+          parts.add(part);
+          start = i + 1;
+        }
+      }
+    }
+
+    final tail = line.substring(start).trim();
+    if (tail.isNotEmpty) parts.add(tail);
+    return parts.length > 1 ? parts : [line];
+  }
+
+  // A segment that is just a bare number — the whole-number part of "2 1/2", not a full ingredient.
+  static final _bareNumberRe = RegExp(r'^[\d¼½¾⅓⅔⅛⅜⅝⅞]+$');
+
+  // Matches the beginning of a new ingredient: a quantity (digit/fraction) or
+  // a known unitless measure word.
+  static final _ingredientStartRe = RegExp(
+    r'^[\d¼½¾⅓⅔⅛⅜⅝⅞]'
+    r'|^(?:pinch|dash|handful|drizzle|splash|knob|sprig|squeeze|bunch|spray)\b',
+    caseSensitive: false,
+  );
+
+  static bool _startsIngredient(String text) => _ingredientStartRe.hasMatch(text);
 
   Future<void> _doParseText() async {
     final text = _rawTextCtrl.text.trim();
@@ -148,17 +297,50 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     }
 
     if (!mounted) return;
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     final selections = await Navigator.push<OcrSelections>(
       context,
       MaterialPageRoute(builder: (_) => OcrSelectorScreen(ocr: ocr!)),
     );
+    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     if (selections != null && mounted) {
-      _applyOcrSelections(selections);
+      final hasContent = _ingredients.any((i) => i['name']!.isNotEmpty) ||
+          _instructionsCtrl.text.isNotEmpty;
+      if (hasContent) {
+        final append = await showModalBottomSheet<bool>(
+          context: context,
+          builder: (_) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.add_circle_outline),
+                  title: const Text('Add to recipe', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Append ingredients and steps to what\'s already here'),
+                  onTap: () => Navigator.pop(context, true),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.refresh_outlined),
+                  title: const Text('Replace recipe', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Overwrite current content'),
+                  onTap: () => Navigator.pop(context, false),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+        if (append == null || !mounted) return;
+        _applyOcrSelections(selections, append: append);
+      } else {
+        _applyOcrSelections(selections);
+      }
     }
   }
 
   /// Build structured text from labelled sections and send to backend.
-  Future<void> _applyOcrSelections(OcrSelections sel) async {
+  Future<void> _applyOcrSelections(OcrSelections sel, {bool append = false}) async {
     // Build well-structured text so backend parse-text works cleanly
     final buf = StringBuffer();
     if (sel.title.isNotEmpty) {
@@ -183,7 +365,35 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       final r = await Api.post('/recipes/parse-text', {'text': structured});
       if (r.statusCode == 200) {
         final data = jsonDecode(r.body) as Map<String, dynamic>;
-        setState(() { _importedData = data; _fillForm(data); });
+        if (!append) {
+          setState(() { _importedData = data; _fillForm(data); });
+        } else {
+          setState(() {
+            _importedData = data;
+            // Fill name only if empty
+            if (_nameCtrl.text.isEmpty) _nameCtrl.text = data['recipe_name'] ?? '';
+            // Append ingredients
+            final newIngs = (data['ingredients'] as List? ?? []);
+            final toAdd = newIngs.map<Map<String, String>>((i) => {
+              'name': i['name']?.toString() ?? '',
+              'quantity': i['quantity']?.toString() ?? '',
+              'unit': i['unit']?.toString() ?? '',
+              '_id': '${_nextIngId++}',
+            }).toList();
+            final hasBlankOnly = _ingredients.length == 1 && _ingredients[0]['name']!.isEmpty;
+            if (hasBlankOnly) {
+              _ingredients = toAdd.isNotEmpty ? toAdd : _ingredients;
+            } else {
+              _ingredients = [..._ingredients, ...toAdd];
+            }
+            // Append instructions
+            final newInst = (data['instructions'] as String? ?? '').trim();
+            if (newInst.isNotEmpty) {
+              final existing = _instructionsCtrl.text.trim();
+              _instructionsCtrl.text = existing.isEmpty ? newInst : '$existing\n$newInst';
+            }
+          });
+        }
       } else {
         setState(() => _error = 'Could not parse text');
       }
@@ -265,6 +475,17 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     );
   }
 
+  Future<void> _openInstructionsEditor() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _InstructionsEditorScreen(controller: _instructionsCtrl),
+      ),
+    );
+    setState(() {}); // refresh the preview
+  }
+
   Future<void> _save() async {
     if (_nameCtrl.text.trim().isEmpty) {
       setState(() => _error = 'Recipe name is required');
@@ -280,6 +501,8 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       'servings': int.tryParse(_servingsCtrl.text) ?? 0,
       'image_url': _imageCtrl.text.trim(),
       'tags': _tagsCtrl.text.trim(),
+      'category': _category,
+      'is_public': _isPublic,
       'instructions': _instructionsCtrl.text.trim(),
       'ingredients': _ingredients
           .where((i) => i['name']!.isNotEmpty)
@@ -571,17 +794,17 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
               child: Row(children: [
                 Expanded(
                   flex: 4,
-                  child: _inlineField(ing['name'] ?? '', 'Ingredient', (v) => setState(() => _ingredients[i]['name'] = v)),
+                  child: _inlineField(ing['name'] ?? '', 'Ingredient', (v) => _ingredients[i]['name'] = v),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   flex: 2,
-                  child: _inlineField(ing['quantity'] ?? '', 'Qty', (v) => setState(() => _ingredients[i]['quantity'] = v)),
+                  child: _inlineField(ing['quantity'] ?? '', 'Qty', (v) => _ingredients[i]['quantity'] = v),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   flex: 2,
-                  child: _inlineField(ing['unit'] ?? '', 'Unit', (v) => setState(() => _ingredients[i]['unit'] = v)),
+                  child: _inlineField(ing['unit'] ?? '', 'Unit', (v) => _ingredients[i]['unit'] = v),
                 ),
                 if (_ingredients.length > 1)
                   IconButton(
@@ -595,43 +818,119 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
           }),
           const SizedBox(height: 20),
 
-          const Text('Instructions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          Row(children: [
+            const Expanded(child: Text('Instructions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+            TextButton.icon(
+              onPressed: _openInstructionsEditor,
+              icon: const Icon(Icons.open_in_full, size: 14),
+              label: const Text('Expand', style: TextStyle(fontSize: 13)),
+              style: TextButton.styleFrom(foregroundColor: const Color(0xFFE8622A), padding: EdgeInsets.zero),
+            ),
+          ]),
           const SizedBox(height: 8),
-          TextField(
-            controller: _instructionsCtrl,
-            maxLines: 8,
-            decoration: InputDecoration(
-              hintText: 'Step-by-step instructions…',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E2DC))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E2DC))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE8622A))),
-              contentPadding: const EdgeInsets.all(14),
+          GestureDetector(
+            onTap: _openInstructionsEditor,
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: 90),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE5E2DC)),
+              ),
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _instructionsCtrl,
+                builder: (_, val, __) => Text(
+                  val.text.isEmpty ? 'Tap to add step-by-step instructions…' : val.text,
+                  style: TextStyle(
+                    fontSize: 13, height: 1.5,
+                    color: val.text.isEmpty ? const Color(0xFFBBB8B2) : const Color(0xFF3A3836),
+                  ),
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),
 
           _sectionLabel('Tags'),
           _textField(_tagsCtrl, 'quick, vegetarian, weeknight…'),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE8622A),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // ── Category ───────────────────────────────────────────
+          _sectionLabel('Category'),
+          _buildCategoryPicker(),
+          const SizedBox(height: 20),
+
+          // ── Share publicly ─────────────────────────────────────
+          if (Store.isReady && Store.i.mode == StorageMode.server) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E2DC)),
               ),
-              child: _saving
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Save Recipe', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Share publicly', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text('Visible to anyone on Explore', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _isPublic,
+                    onChanged: (v) => setState(() => _isPublic = v),
+                    activeColor: const Color(0xFFE8622A),
+                  ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 32),
+          ] else
+            const SizedBox(height: 32),
         ],
       ),
+    );
+  }
+
+  static const _kSuggestedCategories = [
+    'Soup', 'Stew', 'Chili', 'Salad', 'Bowl', 'Pasta', 'Rice', 'Curry',
+    'Stir-fry', 'Tacos', 'Burger', 'Pizza', 'Sandwich', 'Wrap', 'Roast',
+    'Grilled', 'Seafood', 'Breakfast', 'Brunch', 'Eggs', 'Pancakes',
+    'Oatmeal', 'Smoothie', 'Snack', 'Appetizer', 'Side dish', 'Dip',
+    'Bread', 'Cake', 'Cookies', 'Muffins', 'Pie', 'Dessert', 'Drink',
+  ];
+
+  Widget _buildCategoryPicker() {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: _kSuggestedCategories.map((cat) {
+        final active = _category == cat;
+        return GestureDetector(
+          onTap: () => setState(() => _category = active ? '' : cat),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: active ? const Color(0xFF1A1918) : Colors.white,
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: active ? const Color(0xFF1A1918) : const Color(0xFFE5E2DC), width: 1.5),
+            ),
+            child: Text(cat, style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w600,
+              color: active ? Colors.white : const Color(0xFF555250),
+            )),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -846,3 +1145,174 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
 }
 
 enum _ImportMode { url, tiktok, pasteText, manual }
+
+class _InstructionsEditorScreen extends StatefulWidget {
+  final TextEditingController controller;
+  const _InstructionsEditorScreen({required this.controller});
+
+  @override
+  State<_InstructionsEditorScreen> createState() => _InstructionsEditorScreenState();
+}
+
+class _InstructionsEditorScreenState extends State<_InstructionsEditorScreen> {
+  late List<TextEditingController> _steps;
+
+  @override
+  void initState() {
+    super.initState();
+    final raw = widget.controller.text.trim();
+    final lines = raw.isEmpty
+        ? <String>[]
+        : raw.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    // Strip any existing "1. " / "1) " numbering — cook mode re-adds it at display time
+    final cleaned = lines.map((s) => s.replaceFirst(RegExp(r'^\d+[.)]\s*'), '')).toList();
+    _steps = cleaned.map((s) => TextEditingController(text: s)).toList();
+    if (_steps.isEmpty) _steps.add(TextEditingController());
+  }
+
+  @override
+  void dispose() {
+    for (final c in _steps) c.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final text = _steps
+        .map((c) => c.text.trim())
+        .where((s) => s.isNotEmpty)
+        .join('\n');
+    widget.controller.text = text;
+    Navigator.pop(context);
+  }
+
+  void _addStep() => setState(() => _steps.add(TextEditingController()));
+
+  void _deleteStep(int i) {
+    setState(() {
+      _steps[i].dispose();
+      _steps.removeAt(i);
+      if (_steps.isEmpty) _steps.add(TextEditingController());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F6F3),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF7F6F3),
+        elevation: 0,
+        title: const Text('Instructions',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+        leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+        actions: [
+          TextButton(
+            onPressed: _save,
+            child: const Text('Done',
+              style: TextStyle(color: Color(0xFFE8622A), fontWeight: FontWeight.w700, fontSize: 16)),
+          ),
+        ],
+      ),
+      body: ReorderableListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        itemCount: _steps.length,
+        onReorder: (oldIndex, newIndex) {
+          setState(() {
+            if (newIndex > oldIndex) newIndex--;
+            final item = _steps.removeAt(oldIndex);
+            _steps.insert(newIndex, item);
+          });
+        },
+        itemBuilder: (context, i) => _StepCard(
+          key: ValueKey(i),
+          number: i + 1,
+          controller: _steps[i],
+          onDelete: () => _deleteStep(i),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addStep,
+        backgroundColor: const Color(0xFFE8622A),
+        icon: const Icon(Icons.add),
+        label: const Text('Add step'),
+      ),
+    );
+  }
+}
+
+class _StepCard extends StatelessWidget {
+  final int number;
+  final TextEditingController controller;
+  final VoidCallback onDelete;
+
+  const _StepCard({
+    super.key,
+    required this.number,
+    required this.controller,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E2DC)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Step number badge
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+            child: Container(
+              width: 26, height: 26,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8622A),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Center(
+                child: Text('$number',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ),
+          // Editable step text
+          Expanded(
+            child: TextField(
+              controller: controller,
+              maxLines: null,
+              style: const TextStyle(fontSize: 14, height: 1.5),
+              decoration: const InputDecoration(
+                hintText: 'Describe this step…',
+                hintStyle: TextStyle(color: Color(0xFFBBB8B2)),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          // Delete + drag handle
+          Column(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.close, size: 16, color: Color(0xFFCCC9C3)),
+                onPressed: onDelete,
+                padding: const EdgeInsets.fromLTRB(4, 12, 12, 4),
+                constraints: const BoxConstraints(),
+              ),
+              ReorderableDragStartListener(
+                index: number - 1,
+                child: const Padding(
+                  padding: EdgeInsets.fromLTRB(4, 4, 12, 12),
+                  child: Icon(Icons.drag_handle, size: 18, color: Color(0xFFCCC9C3)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

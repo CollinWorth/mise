@@ -12,6 +12,11 @@ import Register from './pages/Register';
 import GroceryList from './pages/GroceryList';
 import AddRecipe from './pages/AddRecipe';
 import EditRecipe from './pages/EditRecipe';
+import CookMode from './pages/CookMode';
+import ExplorePage from './pages/ExplorePage';
+import ProfilePage from './pages/ProfilePage';
+import FeedPage from './pages/FeedPage';
+import UserProfilePage from './pages/UserProfilePage';
 
 function App() {
   const [user, setUser] = useState(getStoredUser);
@@ -34,12 +39,17 @@ function App() {
           <Route path="/" element={<Recipes user={user} />} />
           <Route path="/calendar" element={<Calendar user={user} />} />
           <Route path="/recipes" element={<Recipes user={user} />} />
-          <Route path="/recipes/:id" element={<RecipeDetails />} />
+          <Route path="/recipes/:id" element={<RecipeDetails user={user} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/register" element={<Register />} />
           <Route path="/grocery-list" element={<GroceryList user={user} />} />
           <Route path="/recipes/add" element={<AddRecipe user={user} />} />
           <Route path="/recipes/:id/edit" element={<EditRecipe user={user} />} />
+          <Route path="/recipes/:id/cook" element={<CookMode />} />
+          <Route path="/explore"    element={<ExplorePage user={user} />} />
+          <Route path="/feed"       element={<FeedPage user={user} />} />
+          <Route path="/profile"    element={<ProfilePage user={user} onLogout={handleLogout} />} />
+          <Route path="/users/:id"  element={<UserProfilePage user={user} />} />
         </Routes>
       </div>
     </Router>

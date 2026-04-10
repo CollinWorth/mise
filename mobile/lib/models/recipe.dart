@@ -22,6 +22,13 @@ class Recipe {
   final int servings;
   final String instructions;
   final List<Ingredient> ingredients;
+  // Extended fields
+  final String tags;
+  final String category;
+  final bool isPublic;
+  final int likeCount;
+  final String? authorName;
+  final String? userId;
 
   Recipe({
     required this.id,
@@ -33,6 +40,12 @@ class Recipe {
     required this.servings,
     required this.instructions,
     required this.ingredients,
+    this.tags = '',
+    this.category = '',
+    this.isPublic = false,
+    this.likeCount = 0,
+    this.authorName,
+    this.userId,
   });
 
   int get totalTime => prepTime + cookTime;
@@ -49,5 +62,11 @@ class Recipe {
         ingredients: (j['ingredients'] as List? ?? [])
             .map((i) => Ingredient.fromJson(i as Map<String, dynamic>))
             .toList(),
+        tags: j['tags'] ?? '',
+        category: j['category'] ?? '',
+        isPublic: j['is_public'] as bool? ?? false,
+        likeCount: (j['like_count'] as num?)?.toInt() ?? 0,
+        authorName: j['author_name'] as String?,
+        userId: j['user_id'] as String?,
       );
 }

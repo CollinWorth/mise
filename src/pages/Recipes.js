@@ -57,16 +57,34 @@ export default function Recipes({ user }) {
     );
   }
 
-  // Cuisines for filter chips
-  const cuisines = ['All', ...Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean)))];
+  const cuisineSet  = new Set(recipes.map(r => r.cuisine).filter(Boolean));
+  const categorySet = new Set(recipes.map(r => r.category).filter(Boolean));
+  const tagSet = new Set(
+    recipes.flatMap(r => r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [])
+  );
+  const allFilters = [
+    'All',
+    ...Array.from(cuisineSet),
+    ...Array.from(categorySet).filter(c => !cuisineSet.has(c)),
+    ...Array.from(tagSet).filter(t => !cuisineSet.has(t) && !categorySet.has(t)),
+  ];
 
   const filtered = recipes.filter(r => {
-    const matchSearch = r.recipe_name.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = activeFilter === 'All' || r.cuisine === activeFilter;
+    const q = search.toLowerCase();
+    const matchSearch = !q
+      || r.recipe_name.toLowerCase().includes(q)
+      || (r.category || '').toLowerCase().includes(q)
+      || (r.cuisine  || '').toLowerCase().includes(q)
+      || (r.tags     || '').toLowerCase().includes(q);
+    const recipeTags = r.tags ? r.tags.split(',').map(t => t.trim().toLowerCase()) : [];
+    const matchFilter = activeFilter === 'All'
+      || r.cuisine  === activeFilter
+      || r.category === activeFilter
+      || recipeTags.includes(activeFilter.toLowerCase());
     return matchSearch && matchFilter;
   });
 
-  const [featured, ...rest] = filtered;
+  // const [featured, ...rest] = filtered;
 
   return (
     <div className="recipes-page">
@@ -94,15 +112,15 @@ export default function Recipes({ user }) {
       </div>
 
       {/* Filter chips */}
-      {cuisines.length > 1 && (
+      {allFilters.length > 1 && (
         <div className="recipes-filters">
-          {cuisines.map(c => (
+          {allFilters.map(f => (
             <button
-              key={c}
-              className={`filter-chip${activeFilter === c ? ' filter-chip--active' : ''}`}
-              onClick={() => setActiveFilter(c)}
+              key={f}
+              className={`filter-chip${activeFilter === f ? ' filter-chip--active' : ''}`}
+              onClick={() => setActiveFilter(f)}
             >
-              {c}
+              {f}
             </button>
           ))}
         </div>
@@ -125,60 +143,36 @@ export default function Recipes({ user }) {
           )}
         </div>
       ) : (
-        <>
-          {/* Featured card */}
-          {featured && (
-            <div
-              className="recipe-featured"
-              onClick={() => navigate(`/recipes/${featured._id || featured.id}`)}
-            >
-              <div className="recipe-featured-img">
-                {featured.image_url
-                  ? <img src={featured.image_url} alt={featured.recipe_name} />
-                  : <div className="recipe-placeholder" style={{ background: cuisineGradient(featured.cuisine) }} />
-                }
-              </div>
-              <div className="recipe-featured-overlay">
-                <div className="recipe-featured-tags">
-                  {featured.cuisine && <span className="recipe-overlay-badge">{featured.cuisine}</span>}
-                  {totalTime(featured) && <span className="recipe-overlay-time">{totalTime(featured)}</span>}
-                </div>
-                <h2 className="recipe-featured-title">{featured.recipe_name}</h2>
-                {featured.servings && (
-                  <p className="recipe-featured-sub">Serves {featured.servings}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Grid */}
-          {rest.length > 0 && (
-            <div className="recipe-grid">
-              {rest.map((recipe, idx) => (
-                <div
-                  key={recipe._id || recipe.id || idx}
-                  className="recipe-card"
-                  onClick={() => navigate(`/recipes/${recipe._id || recipe.id}`)}
-                >
-                  <div className="recipe-card-img">
-                    {recipe.image_url
-                      ? <img src={recipe.image_url} alt={recipe.recipe_name} />
-                      : <div className="recipe-placeholder" style={{ background: cuisineGradient(recipe.cuisine) }} />
-                    }
-                    <div className="recipe-card-overlay">
-                      <div className="recipe-card-tags">
-                        {recipe.cuisine && <span className="recipe-overlay-badge">{recipe.cuisine}</span>}
-                        {totalTime(recipe) && <span className="recipe-overlay-time">{totalTime(recipe)}</span>}
-                      </div>
-                      <div className="recipe-card-title">{recipe.recipe_name}</div>
-                      {recipe.servings && <div className="recipe-card-sub">Serves {recipe.servings}</div>}
+        /* Grid */
+        filtered.length > 0 && (
+          <div className="recipe-grid">
+            {filtered.map((recipe, idx) => (
+              <div
+                key={recipe._id || recipe.id || idx}
+                className="recipe-card"
+                onClick={() => navigate(`/recipes/${recipe._id || recipe.id}`)}
+              >
+                <div className="recipe-card-img">
+                  {recipe.image_url
+                    ? <img src={recipe.image_url} alt={recipe.recipe_name} />
+                    : <div className="recipe-placeholder" style={{ background: cuisineGradient(recipe.cuisine) }} />
+                  }
+                  <div className="recipe-card-overlay">
+                    <div className="recipe-card-tags">
+                      {recipe.cuisine && <span className="recipe-overlay-badge">{recipe.cuisine}</span>}
+                      {recipe.tags && recipe.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 2).map(t => (
+                        <span key={t} className="recipe-overlay-badge recipe-overlay-tag">{t}</span>
+                      ))}
+                      {totalTime(recipe) && <span className="recipe-overlay-time">{totalTime(recipe)}</span>}
                     </div>
+                    <div className="recipe-card-title">{recipe.recipe_name}</div>
+                    {recipe.servings && <div className="recipe-card-sub">Serves {recipe.servings}</div>}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

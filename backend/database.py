@@ -10,10 +10,12 @@ uri = os.getenv("MONGODB_URI")
 db_name = os.getenv("DATABASE_NAME", "cookindb")
 client = motor.motor_asyncio.AsyncIOMotorClient(uri)
 db = client[db_name]
-recipes_collection = db.recipes
-users_collection = db.users
-mealPlans_collection = db.mealPlans
-grocery_collection = db.groceryLists
+recipes_collection    = db.recipes
+users_collection      = db.users
+mealPlans_collection  = db.mealPlans
+grocery_collection    = db.groceryLists
+follows_collection    = db.follows
+comments_collection   = db.comments
 
 
 

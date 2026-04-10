@@ -1,0 +1,139 @@
+.feed-page {
+  padding: var(--space-8) clamp(var(--space-4), 4vw, var(--space-10)) var(--space-16);
+}
+.feed-inner {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.feed-title {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-bottom: var(--space-8);
+}
+
+/* ── Post card ── */
+.feed-posts { display: flex; flex-direction: column; gap: var(--space-8); }
+
+.feed-post {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Author header */
+.feed-post-author {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.feed-author-link {
+  display: flex; align-items: center; gap: var(--space-2);
+  text-decoration: none; flex: 1;
+}
+.feed-author-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.feed-author-name {
+  font-size: var(--text-sm); font-weight: 700;
+  color: var(--text-primary);
+  transition: color var(--transition);
+}
+.feed-author-link:hover .feed-author-name { color: var(--accent); }
+
+.feed-post-category {
+  font-size: 11px; font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-light);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  padding: 2px 8px; border-radius: 99px;
+}
+
+/* Image */
+.feed-post-img {
+  width: 100%; cursor: pointer; overflow: hidden;
+  background: var(--bg);
+}
+.feed-post-img img {
+  width: 100%; display: block;
+  aspect-ratio: 4/3; object-fit: cover;
+  transition: transform 0.4s ease;
+}
+.feed-post-img:hover img { transform: scale(1.02); }
+.feed-post-placeholder {
+  aspect-ratio: 4/3;
+  display: flex; align-items: flex-end;
+  padding: var(--space-5);
+  cursor: pointer;
+}
+.feed-post-placeholder-name {
+  font-size: var(--text-xl); font-weight: 800;
+  color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Actions */
+.feed-post-actions {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+.feed-action-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-secondary); padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center;
+  transition: color var(--transition), transform var(--transition);
+}
+.feed-action-btn:hover { color: var(--text-primary); }
+.feed-action-btn:active { transform: scale(0.88); }
+.feed-like-btn--liked { color: var(--accent); }
+.feed-like-btn--liked:hover { color: var(--accent-hover); }
+.feed-save-btn--saved { color: var(--text-primary); }
+
+/* Meta */
+.feed-post-meta {
+  padding: 0 var(--space-4) var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-1);
+}
+.feed-like-count {
+  font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);
+}
+.feed-post-info {
+  cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+}
+.feed-post-title {
+  font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);
+}
+.feed-post-details {
+  font-size: var(--text-xs); color: var(--text-tertiary);
+  display: flex; gap: var(--space-2); align-items: center;
+}
+.feed-dot { opacity: 0.4; }
+.feed-post-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: 2px; }
+.feed-tag { font-size: var(--text-xs); color: var(--accent); font-weight: 500; }
+
+/* Skeletons */
+.feed-skeletons { display: flex; flex-direction: column; gap: var(--space-8); }
+.feed-skeleton {
+  height: 480px; border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-raised) 50%, var(--border) 75%);
+  background-size: 600px 100%;
+  animation: feed-shimmer 1.4s infinite linear;
+}
+@keyframes feed-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+/* Empty */
+.feed-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-4); padding: var(--space-16) var(--space-6);
+  text-align: center;
+}
+.feed-empty-icon { font-size: 3.5rem; opacity: 0.3; }
+.feed-empty h3 { font-size: var(--text-xl); font-weight: 700; }
+.feed-empty p { font-size: var(--text-sm); color: var(--text-secondary); max-width: 300px; }

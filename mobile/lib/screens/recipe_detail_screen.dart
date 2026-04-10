@@ -1,14 +1,116 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../api.dart';
 import '../models/recipe.dart';
+import '../storage/storage.dart';
 import 'add_recipe_screen.dart';
 import 'add_to_grocery_sheet.dart';
+import 'comments_widget.dart';
 import 'cook_mode_screen.dart';
 
-class RecipeDetailScreen extends StatelessWidget {
+class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
   final Map<String, dynamic> user;
   const RecipeDetailScreen({super.key, required this.recipe, required this.user});
+
+  @override
+  State<RecipeDetailScreen> createState() => _RecipeDetailScreenState();
+}
+
+class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
+  late Recipe _recipe;
+  Recipe get recipe => _recipe;
+  Map<String, dynamic> get user => widget.user;
+
+  // Social state (only used when server mode + recipe is public)
+  bool _liked = false;
+  late int _likeCount;
+
+  bool get _showSocial => Store.isReady && Store.i.mode == StorageMode.server && recipe.isPublic;
+
+  @override
+  void initState() {
+    super.initState();
+    _recipe = widget.recipe;
+    _likeCount = recipe.likeCount;
+    if (_showSocial) {
+      _loadLiked();
+    }
+  }
+
+  Future<void> _loadLiked() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('mise_liked');
+    if (raw != null && mounted) {
+      final list = (jsonDecode(raw) as List).cast<String>();
+      setState(() => _liked = list.contains(recipe.id));
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    final wasLiked = _liked;
+    setState(() {
+      _liked = !_liked;
+      _likeCount = (_likeCount + (_liked ? 1 : -1)).clamp(0, 999999);
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('mise_liked');
+    final list = raw != null ? (jsonDecode(raw) as List).cast<String>() : <String>[];
+    _liked ? (list.contains(recipe.id) ? null : list.add(recipe.id)) : list.remove(recipe.id);
+    await prefs.setString('mise_liked', jsonEncode(list));
+    try {
+      await Api.post('/recipes/${recipe.id}/${wasLiked ? 'unlike' : 'like'}', {});
+    } catch (_) {
+      if (mounted) setState(() { _liked = wasLiked; _likeCount = (_likeCount + (wasLiked ? 1 : -1)).clamp(0, 999999); });
+    }
+  }
+
+  Future<void> _openEdit() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddRecipeScreen(user: user, existingRecipe: _recipe),
+        fullscreenDialog: true,
+      ),
+    );
+    if (updated == true && mounted) {
+      // Reload from server so detail screen reflects changes immediately
+      final data = await Store.i.getRecipe(_recipe.id);
+      if (data != null && mounted) {
+        setState(() => _recipe = Recipe.fromJson(data));
+      }
+    }
+  }
+
+  Future<void> _deleteRecipe(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete recipe?'),
+        content: Text('${recipe.name} will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    try {
+      await Store.i.deleteRecipe(recipe.id);
+      if (context.mounted) Navigator.pop(context, 'deleted');
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not delete recipe')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +145,21 @@ class RecipeDetailScreen extends StatelessWidget {
             backgroundColor: const Color(0xFF1A1918),
             iconTheme: const IconThemeData(color: Colors.white),
             actions: [
+              if (_showSocial)
+                GestureDetector(
+                  onTap: _toggleLike,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                    child: Row(children: [
+                      Icon(_liked ? Icons.favorite : Icons.favorite_border,
+                        color: _liked ? const Color(0xFFE8622A) : Colors.white, size: 21),
+                      if (_likeCount > 0) ...[
+                        const SizedBox(width: 4),
+                        Text('$_likeCount', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ]),
+                  ),
+                ),
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
                 tooltip: 'Add to grocery list',
@@ -50,13 +167,12 @@ class RecipeDetailScreen extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AddRecipeScreen(user: user, existingRecipe: recipe),
-                    fullscreenDialog: true,
-                  ),
-                ),
+                onPressed: _openEdit,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.white),
+                tooltip: 'Delete recipe',
+                onPressed: () => _deleteRecipe(context),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -156,8 +272,12 @@ class RecipeDetailScreen extends StatelessWidget {
                         ),
                       );
                     }),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
                   ],
+
+                  // ── Social section (only for public server recipes) ──
+                  if (_showSocial)
+                    CommentsWidget(recipeId: recipe.id, currentUser: user),
                 ],
               ),
             ),

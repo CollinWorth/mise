@@ -3,74 +3,108 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import './css/AddRecipePage.css';
 
-function AddRecipe({ user }) {
-  const navigate = useNavigate();
-  const [form, setForm] = useState({
-    recipe_name: '',
-    instructions: '',
-    prep_time: '',
-    cook_time: '',
-    servings: '',
-    cuisine: '',
-    tags: '',
-    image_url: '',
+const SUGGESTED_CATEGORIES = [
+  'Soup','Stew','Chili','Salad','Bowl','Pasta','Rice','Curry','Stir-fry',
+  'Tacos','Burger','Pizza','Sandwich','Wrap','Roast','Grilled','Seafood',
+  'Breakfast','Brunch','Eggs','Pancakes','Oatmeal','Smoothie',
+  'Snack','Appetizer','Side dish','Dip','Bread','Cake','Cookies',
+  'Muffins','Pie','Dessert','Drink',
+];
+
+const SUGGESTED_TAGS = [
+  'quick','easy','healthy','vegetarian','vegan','gluten-free',
+  'dairy-free','spicy','meal prep','high-protein','low-carb',
+  'keto','comfort food','weeknight','kid-friendly','budget-friendly',
+];
+
+const METHODS = [
+  { id: 'url',    icon: '🔗', label: 'Import from URL',    sub: 'Paste a link from any recipe website or blog' },
+  { id: 'tiktok', icon: '🎵', label: 'Import from TikTok', sub: "Share a TikTok link — we'll pull the recipe from the description" },
+  { id: 'paste',  icon: '📋', label: 'Paste text',          sub: "Paste a recipe from anywhere and we'll parse it" },
+  { id: 'manual', icon: '✍️', label: 'Enter manually',      sub: 'Type in the recipe yourself' },
+];
+
+function emptyForm(user) {
+  return {
+    recipe_name: '', prep_time: '', cook_time: '', servings: '',
+    cuisine: '', category: '', tags: '', image_url: '', is_public: false,
     user_id: user?.id || user?._id || '',
-  });
+  };
+}
+
+export default function AddRecipe({ user }) {
+  const navigate = useNavigate();
+  const [method, setMethod]           = useState(null);
+  const [form, setForm]               = useState(() => emptyForm(user));
   const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: '' }]);
-  const [submitting, setSubmitting] = useState(false);
-  const [importUrl, setImportUrl] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [steps, setSteps]             = useState(['']);
+  const [importing, setImporting]     = useState(false);
+  const [imported, setImported]       = useState(false);
+  const [importUrl, setImportUrl]     = useState('');
+  const [pasteText, setPasteText]     = useState('');
   const [importError, setImportError] = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [tagInput, setTagInput]       = useState('');
+
+  const currentTags = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const addTag = tag => {
+    const t = tag.trim().toLowerCase();
+    if (!t || currentTags.map(x => x.toLowerCase()).includes(t)) return;
+    setForm(f => ({ ...f, tags: [...currentTags, t].join(', ') }));
+  };
+  const removeTag = tag => setForm(f => ({ ...f, tags: currentTags.filter(t => t !== tag).join(', ') }));
 
   useEffect(() => {
-    if (user && (user.id || user._id)) {
-      setForm((f) => ({ ...f, user_id: user.id || user._id }));
-    }
+    if (user && (user.id || user._id))
+      setForm(f => ({ ...f, user_id: user.id || user._id }));
   }, [user]);
 
-  const handleImport = async () => {
-    if (!importUrl.trim()) return;
-    setImporting(true);
-    setImportError('');
-    try {
-      const r = await apiFetch('/recipes/scrape', {
-        method: 'POST',
-        body: JSON.stringify({ url: importUrl.trim() }),
-      });
-      if (!r.ok) {
-        const err = await r.json();
-        setImportError(err.detail || 'Failed to import recipe');
-        setImporting(false);
-        return;
-      }
-      const data = await r.json();
-      setForm(f => ({
-        ...f,
-        recipe_name: data.recipe_name || f.recipe_name,
-        cuisine: data.cuisine || f.cuisine,
-        image_url: data.image_url || f.image_url,
-        prep_time: data.prep_time || f.prep_time,
-        cook_time: data.cook_time || f.cook_time,
-        servings: data.servings || f.servings,
-        instructions: data.instructions || f.instructions,
-        tags: data.tags || f.tags,
-      }));
-      if (data.ingredients && data.ingredients.length > 0) {
-        setIngredients(data.ingredients);
-      }
-      setImportUrl('');
-    } catch (e) {
-      setImportError('Could not reach the server');
+  const fillForm = (data) => {
+    setForm(f => ({
+      ...f,
+      recipe_name: data.recipe_name || f.recipe_name,
+      cuisine:     data.cuisine     || f.cuisine,
+      category:    data.category    || f.category,
+      image_url:   data.image_url   || f.image_url,
+      prep_time:   data.prep_time != null ? String(data.prep_time) : f.prep_time,
+      cook_time:   data.cook_time != null ? String(data.cook_time) : f.cook_time,
+      servings:    data.servings    || f.servings,
+      tags:        data.tags        || f.tags,
+    }));
+    if (data.ingredients?.length) setIngredients(data.ingredients);
+    if (data.instructions) {
+      const lines = data.instructions.split('\n')
+        .map(s => s.replace(/^\d+[.)]\s*/, '').trim())
+        .filter(Boolean);
+      setSteps(lines.length ? lines : ['']);
     }
+    setImported(true);
+    setMethod('manual');
+  };
+
+  const handleImport = async () => {
+    const url = importUrl.trim();
+    if (!url) return;
+    setImporting(true); setImportError('');
+    try {
+      const r = await apiFetch('/recipes/scrape-smart', { method: 'POST', body: JSON.stringify({ url }) });
+      const data = await r.json();
+      if (!r.ok) { setImportError(data.detail || 'Failed to import'); setImporting(false); return; }
+      fillForm(data);
+    } catch { setImportError('Could not reach server'); }
     setImporting(false);
   };
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleIngredientChange = (idx, e) => {
-    setIngredients(ingredients.map((ing, i) =>
-      i === idx ? { ...ing, [e.target.name]: e.target.value } : ing
-    ));
+  const handleParseText = async () => {
+    if (!pasteText.trim()) return;
+    setImporting(true); setImportError('');
+    try {
+      const r = await apiFetch('/recipes/parse-text', { method: 'POST', body: JSON.stringify({ text: pasteText.trim() }) });
+      const data = await r.json();
+      if (!r.ok) { setImportError(data.detail || 'Could not parse'); setImporting(false); return; }
+      fillForm(data);
+    } catch { setImportError('Could not reach server'); }
+    setImporting(false);
   };
 
   const handleSubmit = async (e) => {
@@ -78,122 +112,256 @@ function AddRecipe({ user }) {
     setSubmitting(true);
     const recipe = {
       ...form,
-      ingredients: ingredients.map((ing) => ({ name: ing.name, quantity: ing.quantity, unit: ing.unit })),
+      instructions: steps.filter(Boolean).join('\n'),
+      ingredients: ingredients.filter(i => i.name).map(({ name, quantity, unit }) => ({ name, quantity, unit })),
       prep_time: form.prep_time ? Number(form.prep_time) : undefined,
       cook_time: form.cook_time ? Number(form.cook_time) : undefined,
-      servings: form.servings ? Number(form.servings) : undefined,
+      servings:  form.servings  ? Number(form.servings)  : undefined,
     };
     try {
-      const response = await apiFetch('/recipes', {
-        method: 'POST',
-        body: JSON.stringify(recipe),
-      });
-      if (response.ok) {
-        navigate('/recipes');
-      } else {
-        alert('Failed to add recipe');
-      }
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+      const res = await apiFetch('/recipes', { method: 'POST', body: JSON.stringify(recipe) });
+      if (res.ok) navigate('/recipes');
+      else alert('Failed to save recipe');
+    } catch (err) { alert('Error: ' + err.message); }
     setSubmitting(false);
   };
 
-  return (
-    <div className="page">
-      <div className="page-header">
-        <h1>Add Recipe</h1>
-        <button className="btn-ghost" onClick={() => navigate('/recipes')}>Cancel</button>
-      </div>
+  const updateIng  = (idx, field, val) => setIngredients(ingredients.map((x, i) => i === idx ? { ...x, [field]: val } : x));
+  const updateStep = (idx, val)        => setSteps(steps.map((s, i) => i === idx ? val : s));
 
-      <div className="import-url-bar">
-        <input
-          type="url"
-          className="import-url-input"
-          placeholder="Paste a recipe URL to import…"
-          value={importUrl}
-          onChange={e => { setImportUrl(e.target.value); setImportError(''); }}
-          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleImport())}
-        />
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={handleImport}
-          disabled={importing || !importUrl.trim()}
-        >
-          {importing ? 'Importing…' : 'Import'}
-        </button>
-      </div>
-      {importError && <p className="import-error">{importError}</p>}
-
-      <form className="add-recipe-form" onSubmit={handleSubmit}>
-        <div className="add-recipe-form-grid">
-          <label>
-            Title
-            <input type="text" name="recipe_name" value={form.recipe_name} onChange={handleChange} required />
-          </label>
-          <label>
-            Cuisine
-            <input type="text" name="cuisine" value={form.cuisine} onChange={handleChange} />
-          </label>
-          <label>
-            Tags
-            <input type="text" name="tags" value={form.tags} onChange={handleChange} placeholder="comma separated" />
-          </label>
-          <label>
-            Image URL
-            <input type="text" name="image_url" value={form.image_url} onChange={handleChange} />
-          </label>
-          <label>
-            Prep Time (min)
-            <input type="number" name="prep_time" value={form.prep_time} onChange={handleChange} min="0" />
-          </label>
-          <label>
-            Cook Time (min)
-            <input type="number" name="cook_time" value={form.cook_time} onChange={handleChange} min="0" />
-          </label>
-          <label>
-            Servings
-            <input type="number" name="servings" value={form.servings} onChange={handleChange} min="1" />
-          </label>
-
-          <label className="full-width">
-            Ingredients
-            {ingredients.map((ingredient, idx) => (
-              <div key={idx} className="ingredient-row">
-                <input type="text" name="name" placeholder="Name" value={ingredient.name}
-                  onChange={(e) => handleIngredientChange(idx, e)} required />
-                <input type="text" name="quantity" placeholder="Qty" value={ingredient.quantity}
-                  onChange={(e) => handleIngredientChange(idx, e)} required />
-                <input type="text" name="unit" placeholder="Unit" value={ingredient.unit}
-                  onChange={(e) => handleIngredientChange(idx, e)} />
-                {ingredients.length > 1 && (
-                  <button type="button" className="btn-remove-ingredient"
-                    onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
-                )}
+  // ── Method picker ────────────────────────────────────────────
+  if (!method) {
+    return (
+      <div className="page ar-page">
+        <button className="ar-back" onClick={() => navigate('/recipes')}>← Recipes</button>
+        <h1 className="ar-heading">How would you like to<br />add a recipe?</h1>
+        <div className="ar-methods">
+          {METHODS.map(m => (
+            <button key={m.id} className="ar-method-card" onClick={() => setMethod(m.id)}>
+              <span className="ar-method-icon">{m.icon}</span>
+              <div className="ar-method-text">
+                <div className="ar-method-label">{m.label}</div>
+                <div className="ar-method-sub">{m.sub}</div>
               </div>
-            ))}
-            <button type="button" className="btn-add-ingredient"
-              onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }])}>
-              + Add ingredient
+              <span className="ar-chevron">›</span>
             </button>
-          </label>
-
-          <label className="full-width">
-            Instructions
-            <textarea name="instructions" value={form.instructions} onChange={handleChange} required rows={7} />
-          </label>
+          ))}
         </div>
+      </div>
+    );
+  }
 
-        <div className="add-recipe-actions">
-          <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? 'Saving...' : 'Save Recipe'}
+  const showImportPanel = (method === 'url' || method === 'tiktok' || method === 'paste') && !imported;
+
+  return (
+    <div className="page ar-page">
+      <div className="ar-topbar">
+        <button className="ar-back" onClick={() => { setMethod(null); setImported(false); setImportError(''); }}>
+          ← Back
+        </button>
+        {!showImportPanel && (
+          <button className="btn-primary" form="recipe-form" type="submit" disabled={submitting}>
+            {submitting ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" className="btn-ghost" onClick={() => navigate('/recipes')}>Cancel</button>
+        )}
+      </div>
+
+      {/* ── Import panels ──────────────────────────────────── */}
+      {showImportPanel && (
+        <div className="ar-import-panel">
+          {(method === 'url' || method === 'tiktok') && (
+            <>
+              <h2 className="ar-import-title">
+                {method === 'tiktok' ? 'Paste your TikTok link' : 'Paste a recipe URL'}
+              </h2>
+              {method === 'tiktok' && (
+                <p className="ar-import-hint">In TikTok → tap Share → Copy link, then paste it here.</p>
+              )}
+              <div className="ar-import-row">
+                <input
+                  type="url"
+                  placeholder={method === 'tiktok' ? 'https://www.tiktok.com/…' : 'https://…'}
+                  value={importUrl}
+                  onChange={e => { setImportUrl(e.target.value); setImportError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleImport())}
+                  autoFocus
+                />
+                <button className="btn-primary" onClick={handleImport} disabled={importing || !importUrl.trim()}>
+                  {importing ? <span className="ar-spinner" /> : 'Extract recipe'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {method === 'paste' && (
+            <>
+              <h2 className="ar-import-title">Paste recipe text</h2>
+              <p className="ar-import-hint">Paste from anywhere — we'll detect the title, ingredients, and steps.</p>
+              <textarea
+                className="ar-paste-area"
+                placeholder="Paste recipe text here…"
+                value={pasteText}
+                onChange={e => { setPasteText(e.target.value); setImportError(''); }}
+                rows={10}
+                autoFocus
+              />
+              <button className="btn-primary ar-parse-btn" onClick={handleParseText} disabled={importing || !pasteText.trim()}>
+                {importing ? <span className="ar-spinner" /> : 'Parse recipe'}
+              </button>
+            </>
+          )}
+
+          {importError && <p className="ar-import-error">{importError}</p>}
         </div>
-      </form>
+      )}
+
+      {/* ── Recipe form ─────────────────────────────────────── */}
+      {!showImportPanel && (
+        <>
+          {imported && (
+            <div className="ar-success-banner">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="8" fill="#2D9D5C"/><path d="M4.5 8.5l2.5 2.5 4.5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Recipe imported — review and save.
+              <button className="ar-reimport" onClick={() => { setImported(false); setMethod(method === 'manual' ? 'url' : method); }}>Re-import</button>
+            </div>
+          )}
+
+          <form id="recipe-form" className="ar-form" onSubmit={handleSubmit}>
+            <section className="ar-section">
+              <h3 className="ar-section-title">Details</h3>
+              <div className="ar-grid">
+                <label className="ar-label ar-col-2">
+                  Recipe name *
+                  <input type="text" value={form.recipe_name} onChange={e => setForm({...form, recipe_name: e.target.value})} required placeholder="e.g. Spaghetti Carbonara" />
+                </label>
+                <label className="ar-label">
+                  Cuisine
+                  <input type="text" value={form.cuisine} onChange={e => setForm({...form, cuisine: e.target.value})} placeholder="e.g. Italian" />
+                </label>
+                <div className="ar-label ar-col-2">
+                  Category
+                  <div className="ar-tag-suggestions">
+                    {SUGGESTED_CATEGORIES.map(cat => (
+                      <button key={cat} type="button"
+                        className={`ar-tag-suggest${form.category === cat ? ' ar-tag-suggest--active' : ''}`}
+                        onClick={() => setForm(f => ({ ...f, category: f.category === cat ? '' : cat }))}>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="text" value={form.category} onChange={e => setForm({...form, category: e.target.value})} placeholder="Or type a custom category…" />
+                </div>
+                <div className="ar-label ar-col-2">
+                  Tags
+                  <div className="ar-tag-suggestions">
+                    {SUGGESTED_TAGS.filter(t => !currentTags.map(x => x.toLowerCase()).includes(t)).map(t => (
+                      <button key={t} type="button" className="ar-tag-suggest" onClick={() => addTag(t)}>+ {t}</button>
+                    ))}
+                  </div>
+                  <div className="ar-tag-input-row">
+                    {currentTags.map(t => (
+                      <span key={t} className="ar-tag-pill">
+                        {t}<button type="button" className="ar-tag-pill-remove" onClick={() => removeTag(t)}>×</button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      className="ar-tag-text-input"
+                      placeholder={currentTags.length ? 'Add more…' : 'Type a tag…'}
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      onKeyDown={e => {
+                        if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                          e.preventDefault(); addTag(tagInput); setTagInput('');
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <label className="ar-label">
+                  Prep (min)
+                  <input type="number" value={form.prep_time} onChange={e => setForm({...form, prep_time: e.target.value})} min="0" />
+                </label>
+                <label className="ar-label">
+                  Cook (min)
+                  <input type="number" value={form.cook_time} onChange={e => setForm({...form, cook_time: e.target.value})} min="0" />
+                </label>
+                <label className="ar-label">
+                  Servings
+                  <input type="number" value={form.servings} onChange={e => setForm({...form, servings: e.target.value})} min="1" />
+                </label>
+                <label className="ar-label ar-col-2">
+                  Image URL
+                  <input type="url" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://…" />
+                </label>
+                <div className="ar-label ar-col-2 ar-toggle-row">
+                  <div>
+                    <span className="ar-toggle-label">Share publicly</span>
+                    <span className="ar-toggle-sub">Show this recipe on Explore for others to discover</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={`ar-toggle${form.is_public ? ' ar-toggle--on' : ''}`}
+                    onClick={() => setForm(f => ({ ...f, is_public: !f.is_public }))}
+                    role="switch"
+                    aria-checked={form.is_public}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="ar-section">
+              <h3 className="ar-section-title">Ingredients</h3>
+              <div className="ar-ingredients">
+                {ingredients.map((ing, idx) => (
+                  <div key={idx} className="ar-ing-row">
+                    <input className="ar-ing-qty"  type="text" placeholder="Qty"  value={ing.quantity} onChange={e => updateIng(idx, 'quantity', e.target.value)} />
+                    <input className="ar-ing-unit" type="text" placeholder="Unit" value={ing.unit}     onChange={e => updateIng(idx, 'unit',     e.target.value)} />
+                    <input className="ar-ing-name" type="text" placeholder="Ingredient name" value={ing.name} onChange={e => updateIng(idx, 'name', e.target.value)} />
+                    {ingredients.length > 1 && (
+                      <button type="button" className="ar-remove" onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" className="ar-add-row" onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }])}>
+                  + Add ingredient
+                </button>
+              </div>
+            </section>
+
+            <section className="ar-section">
+              <h3 className="ar-section-title">Instructions</h3>
+              <div className="ar-steps">
+                {steps.map((step, idx) => (
+                  <div key={idx} className="ar-step-row">
+                    <span className="ar-step-num">{idx + 1}</span>
+                    <textarea
+                      className="ar-step-input"
+                      placeholder={`Step ${idx + 1}…`}
+                      value={step}
+                      rows={2}
+                      onChange={e => updateStep(idx, e.target.value)}
+                    />
+                    {steps.length > 1 && (
+                      <button type="button" className="ar-remove" onClick={() => setSteps(steps.filter((_, i) => i !== idx))}>✕</button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" className="ar-add-row" onClick={() => setSteps([...steps, ''])}>
+                  + Add step
+                </button>
+              </div>
+            </section>
+
+            <div className="ar-footer">
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Save Recipe'}
+              </button>
+              <button type="button" className="btn-ghost" onClick={() => navigate('/recipes')}>Cancel</button>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   );
 }
-
-export default AddRecipe;

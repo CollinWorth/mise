@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from bson import ObjectId
-from database import mealPlans_collection, recipes_collection
+from database import mealPlans_collection, recipes_collection, users_collection, follows_collection
 from model import Recipe
 from auth import get_current_user_id
 from pydantic import BaseModel
@@ -244,6 +244,46 @@ def recipe_to_json(recipe):
     if isinstance(recipe.get("user_id"), ObjectId):
         recipe["user_id"] = str(recipe["user_id"])
     return recipe
+
+
+async def _attach_author_names(results: list) -> list:
+    uid_set = list({r["user_id"] for r in results if r.get("user_id")})
+    if not uid_set:
+        return results
+    try:
+        authors = await users_collection.find(
+            {"_id": {"$in": [ObjectId(u) for u in uid_set]}}
+        ).to_list(len(uid_set))
+        author_map = {str(u["_id"]): u.get("name", "Chef") for u in authors}
+        for r in results:
+            r["author_name"] = author_map.get(r.get("user_id", ""), "Chef")
+    except Exception:
+        pass
+    return results
+
+
+@router.get("/feed")
+async def get_feed(current_user_id: str = Depends(get_current_user_id), skip: int = 0, limit: int = 20):
+    following = await follows_collection.find({"follower_id": current_user_id}).to_list(1000)
+    if not following:
+        return []
+    following_ids = [ObjectId(f["following_id"]) for f in following]
+    cursor = recipes_collection.find(
+        {"user_id": {"$in": following_ids}, "is_public": True}
+    ).sort("_id", -1).skip(skip).limit(limit)
+    results = []
+    async for r in cursor:
+        results.append(recipe_to_json(r))
+    return await _attach_author_names(results)
+
+
+@router.get("/explore")
+async def explore_recipes(skip: int = 0, limit: int = 100):
+    cursor = recipes_collection.find({"is_public": True}).skip(skip).limit(limit)
+    results = []
+    async for r in cursor:
+        results.append(recipe_to_json(r))
+    return await _attach_author_names(results)
 
 
 @router.get("/user/{user_id}")
@@ -715,14 +755,17 @@ def parse_recipe_text(text: str) -> dict:
     # ── Cuisine inference ──────────────────────────────────────────────────────
     cuisine = _infer_cuisine(recipe_name, ingredients)
 
-    # ── Instruction segmentation: split prose blobs into sentences ────────────
+    # ── Instruction segmentation: split prose blobs into individual steps ────────
     expanded: list[str] = []
     for line in inst_lines:
-        # If line is a long prose paragraph (no leading number) and NLTK is available,
-        # split it into individual sentences for cleaner step display
-        if _HAS_NLTK and len(line) > 120 and not re.match(r'^\d+[\.\)]\s', line):
-            sentences = _sent_tokenize(line)
-            expanded.extend(s.strip() for s in sentences if s.strip())
+        if len(line) > 60 and not re.match(r'^\d+[\.\)]\s', line):
+            if _HAS_NLTK:
+                sentences = _sent_tokenize(line)
+            else:
+                # Regex fallback: split on sentence-ending punctuation before a capital letter
+                sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', line)
+            parts = [s.strip() for s in sentences if s.strip()]
+            expanded.extend(parts if len(parts) > 1 else [line])
         else:
             expanded.append(line)
     inst_lines = expanded
@@ -818,6 +861,43 @@ def _parse_colon_ingredient(line: str) -> dict | None:
     if unit.lower() not in UNITS:
         unit = ''
     return {'name': name, 'quantity': qty, 'unit': unit} if name else None
+
+
+@router.post("/{recipe_id}/like")
+async def like_recipe(recipe_id: str):
+    result = await recipes_collection.find_one_and_update(
+        {"_id": ObjectId(recipe_id)},
+        {"$inc": {"like_count": 1}},
+        return_document=True,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return {"like_count": result.get("like_count", 0) + 1}
+
+
+@router.post("/{recipe_id}/unlike")
+async def unlike_recipe(recipe_id: str):
+    result = await recipes_collection.find_one_and_update(
+        {"_id": ObjectId(recipe_id)},
+        {"$inc": {"like_count": -1}},
+        return_document=True,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return {"like_count": max(0, result.get("like_count", 1) - 1)}
+
+
+@router.post("/{recipe_id}/save")
+async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_current_user_id)):
+    source = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+    if not source:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    copy = {k: v for k, v in source.items() if k not in ("_id", "user_id", "like_count", "is_public")}
+    copy["user_id"] = ObjectId(user_id)
+    copy["is_public"] = False
+    copy["like_count"] = 0
+    result = await recipes_collection.insert_one(copy)
+    return {"id": str(result.inserted_id), "message": "Saved to your recipes"}
 
 
 @router.post("/")

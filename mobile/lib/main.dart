@@ -6,10 +6,11 @@ import 'services/theme_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/recipes_screen.dart';
 import 'screens/planner_screen.dart';
-import 'screens/grocery_screen.dart';
 import 'screens/add_recipe_screen.dart';
 import 'screens/storage_setup_screen.dart';
-import 'screens/settings_screen.dart';
+import 'screens/grocery_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/social_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -168,10 +169,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
+      SocialScreen(user: widget.user),
       RecipesScreen(key: _recipesKey, user: widget.user),
       PlannerScreen(user: widget.user),
       GroceryScreen(user: widget.user),
-      SettingsScreen(
+      ProfileScreen(
         user: widget.user,
         onLogout: widget.onLogout,
         onStorageChange: _resetToSetup,
@@ -180,7 +182,7 @@ class _HomeShellState extends State<HomeShell> {
 
     return Scaffold(
       body: IndexedStack(index: _tab, children: screens),
-      floatingActionButton: _tab == 0
+      floatingActionButton: _tab == 1
           ? FloatingActionButton(
               onPressed: () => _openAddRecipe(null),
               backgroundColor: const Color(0xFFE8622A),
@@ -202,10 +204,11 @@ class _MiseNavBar extends StatelessWidget {
   const _MiseNavBar({required this.current, required this.onTap});
 
   static const _items = [
+    (icon: Icons.explore_outlined,        activeIcon: Icons.explore,         label: 'Discover'),
     (icon: Icons.menu_book_outlined,      activeIcon: Icons.menu_book,       label: 'Recipes'),
     (icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today,  label: 'Planner'),
     (icon: Icons.shopping_cart_outlined,  activeIcon: Icons.shopping_cart,   label: 'Grocery'),
-    (icon: Icons.settings_outlined,       activeIcon: Icons.settings,        label: 'Settings'),
+    (icon: Icons.person_outline,          activeIcon: Icons.person,          label: 'Profile'),
   ];
 
   @override
