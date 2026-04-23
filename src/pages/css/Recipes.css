@@ -341,6 +341,31 @@
 .recipes-empty h3 { font-size: var(--text-xl); }
 .recipes-empty p { color: var(--text-secondary); font-size: var(--text-sm); margin-bottom: var(--space-3); }
 
+/* ── Dark mode overrides ─────────────────────────────── */
+[data-theme="dark"] .recipe-card {
+  background: var(--surface);
+}
+[data-theme="dark"] .recipe-card--text {
+  border: 1.5px solid var(--border);
+}
+[data-theme="dark"] .recipe-card-text {
+  background: var(--surface-raised) !important;
+}
+[data-theme="dark"] .recipe-card--text .recipe-card-title {
+  color: var(--text-primary);
+}
+[data-theme="dark"] .recipe-card--text .recipe-card-sub {
+  color: var(--text-tertiary);
+}
+[data-theme="dark"] .recipe-featured {
+  background: #111110;
+}
+[data-theme="dark"] .filter-chip--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 1100px) {
   .recipe-grid { columns: 3; }

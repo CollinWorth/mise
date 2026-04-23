@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './styles/global.css';
 import './App.css';
 import './components/css/Toast.css';
@@ -40,7 +40,7 @@ function App() {
       <div className="App">
         <NavBar user={user} onLogout={handleLogout} />
         <Routes>
-          <Route path="/" element={<Recipes user={user} />} />
+          <Route path="/" element={user ? <Recipes user={user} /> : <Navigate to="/discover" replace />} />
           <Route path="/calendar" element={<Calendar user={user} />} />
           <Route path="/recipes" element={<Recipes user={user} />} />
           <Route path="/recipes/add" element={<AddRecipe user={user} />} />

@@ -123,6 +123,21 @@
 .feed-post-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: 2px; }
 .feed-tag { font-size: var(--text-xs); color: var(--accent); font-weight: 500; }
 
+/* Dark mode placeholder */
+[data-theme="dark"] .feed-post-placeholder {
+  background: var(--surface-raised) !important;
+}
+[data-theme="dark"] .feed-post-placeholder-name {
+  color: var(--text-primary);
+}
+[data-theme="dark"] .feed-placeholder-time {
+  color: var(--text-tertiary);
+}
+[data-theme="dark"] .feed-placeholder-pill {
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.08);
+}
+
 /* Skeletons */
 .feed-skeletons { display: flex; flex-direction: column; gap: var(--space-8); }
 .feed-skeleton {
