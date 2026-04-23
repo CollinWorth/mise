@@ -59,23 +59,14 @@ cd "$PROJECT_DIR"
 
 ok "Frontend built"
 
-# ─── 4. Restart backend service ───────────────────────────────────────────────
-step "Restarting backend..."
+# ─── 4. Restart services ──────────────────────────────────────────────────────
+step "Restarting services..."
 
 if command -v pm2 &>/dev/null; then
-  pm2 restart api && ok "PM2 process restarted"
-elif systemctl is-active --quiet mise-api 2>/dev/null; then
-  sudo systemctl restart mise-api && ok "systemd service restarted"
+  pm2 restart api     && ok "Backend restarted"
+  pm2 restart frontend && ok "Frontend restarted"
 else
-  echo "  ⚠️  No PM2 or known systemd service found — restart your backend manually"
-fi
-
-# ─── 5. Reload nginx ──────────────────────────────────────────────────────────
-step "Reloading nginx..."
-if systemctl is-active --quiet nginx 2>/dev/null; then
-  sudo systemctl reload nginx && ok "nginx reloaded"
-else
-  echo "  ⚠️  nginx not running — skipping"
+  err "PM2 not found — run: npm install -g pm2"
 fi
 
 echo ""
