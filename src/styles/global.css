@@ -171,10 +171,10 @@ button {
 
 .btn-danger {
   background: transparent;
-  border: 1.5px solid #FECACA;
+  border: 1.5px solid rgba(220, 38, 38, 0.25);
   color: var(--error);
 }
-.btn-danger:hover { background: #FFF5F5; border-color: #FCA5A5; }
+.btn-danger:hover { background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.45); }
 
 /* --- LAYOUT --- */
 .page {

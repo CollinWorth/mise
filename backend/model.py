@@ -21,6 +21,8 @@ class Recipe(BaseModel):
     image_url: Optional[str] = Field(default=None, title="Image URL for the Recipe")
     is_public: bool = False
     like_count: int = 0
+    avg_rating: float = 0.0
+    rating_count: int = 0
     user_id: str
     original_recipe_id: Optional[str] = None
     original_author_name: Optional[str] = None

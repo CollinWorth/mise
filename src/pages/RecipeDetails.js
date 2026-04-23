@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import { useToast } from '../contexts/ToastContext';
+import StarRating from '../components/StarRating';
 import './css/RecipeDetails.css';
 
 const CUISINE_PASTELS = {
@@ -38,8 +39,10 @@ export default function RecipeDetails({ user }) {
   const [versions, setVersions] = useState([]);
   const [showVersions, setShowVersions] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
+  const [userRating, setUserRating] = useState(null);
+  const [avgRating, setAvgRating] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
+  const [raters, setRaters] = useState([]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
@@ -47,18 +50,20 @@ export default function RecipeDetails({ user }) {
     Promise.all([
       apiFetch(`/recipes/${id}`).then(r => r.ok ? r.json() : null),
       apiFetch(`/comments/${id}`).then(r => r.ok ? r.json() : []),
-    ]).then(([data, cmts]) => {
+      apiFetch(`/ratings/${id}`).then(r => r.ok ? r.json() : null),
+    ]).then(([data, cmts, ratingData]) => {
       setRecipe(data);
       if (data?.servings) setServings(data.servings);
       setComments(cmts || []);
-      setLikeCount(data?.like_count || 0);
+      if (ratingData) {
+        setUserRating(ratingData.user_rating);
+        setAvgRating(ratingData.avg_rating);
+        setRatingCount(ratingData.rating_count);
+        setRaters(ratingData.raters || []);
+      }
       setLoading(false);
       if (data?.is_public) {
         apiFetch(`/recipes/${id}/versions`).then(r => r.ok ? r.json() : []).then(setVersions).catch(() => {});
-        try {
-          const stored = JSON.parse(localStorage.getItem('mise_liked') || '[]');
-          setLiked(stored.includes(id));
-        } catch {}
       }
     }).catch(() => setLoading(false));
   }, [id]);
@@ -85,17 +90,26 @@ export default function RecipeDetails({ user }) {
     } catch {}
   };
 
-  const handleLike = async () => {
-    if (liked) return;
-    setLiked(true);
-    setLikeCount(c => c + 1);
+  const handleRate = async (newRating) => {
+    const prev = userRating;
+    setUserRating(newRating || null);
     try {
-      const stored = JSON.parse(localStorage.getItem('mise_liked') || '[]');
-      if (!stored.includes(id)) { stored.push(id); localStorage.setItem('mise_liked', JSON.stringify(stored)); }
-      await apiFetch(`/recipes/${id}/like`, { method: 'POST', body: '{}' });
+      let res;
+      if (!newRating) {
+        res = await apiFetch(`/ratings/${id}`, { method: 'DELETE' });
+      } else {
+        res = await apiFetch(`/ratings/${id}`, { method: 'POST', body: JSON.stringify({ rating: newRating }) });
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setAvgRating(data.avg_rating);
+        setRatingCount(data.rating_count);
+        apiFetch(`/ratings/${id}`).then(r => r.ok ? r.json() : null).then(d => { if (d) setRaters(d.raters || []); });
+      } else {
+        setUserRating(prev);
+      }
     } catch {
-      setLiked(false);
-      setLikeCount(c => Math.max(0, c - 1));
+      setUserRating(prev);
     }
   };
 
@@ -272,17 +286,16 @@ export default function RecipeDetails({ user }) {
             </button>
           )}
           {isPublic && (
-            <button
-              className={`rd-like-btn${liked ? ' rd-like-btn--liked' : ''}`}
-              onClick={handleLike}
-              title={liked ? 'Liked' : 'Like this recipe'}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill={liked ? 'currentColor' : 'none'}>
-                <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.567 3.067 2 5 2C6.126 2 7.12 2.557 7.758 3.41L8 3.73L8.242 3.41C8.88 2.557 9.874 2 11 2C12.933 2 14.5 3.567 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z"
-                  stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-              </svg>
-              {likeCount > 0 && <span>{likeCount}</span>}
-            </button>
+            <div className="rd-rating">
+              <StarRating
+                rating={userRating || 0}
+                onChange={user ? handleRate : undefined}
+                size="lg"
+              />
+              {ratingCount > 0 && (
+                <span className="rd-rating-avg">{avgRating.toFixed(1)} ({ratingCount})</span>
+              )}
+            </div>
           )}
           <button
             className="btn-ghost"
@@ -300,6 +313,21 @@ export default function RecipeDetails({ user }) {
             </>
           )}
         </div>
+
+        {/* ── Raters ───────────────────────────────────────── */}
+        {raters.length > 0 && (
+          <div className="rd-raters">
+            <h3 className="rd-raters-title">Ratings ({ratingCount})</h3>
+            <div className="rd-raters-list">
+              {raters.map(r => (
+                <div key={r.user_id} className="rd-rater-row">
+                  <span className="rd-rater-name">{r.user_name}</span>
+                  <StarRating rating={r.rating} size="sm" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Comments ─────────────────────────────────────── */}
         <div className="rd-comments">

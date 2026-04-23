@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../api';
 import './css/AddRecipePage.css';
@@ -22,9 +22,17 @@ function EditRecipe({ user }) {
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [ingredients, setIngredients] = useState([]);
+  const [steps, setSteps] = useState(['']);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tagInput, setTagInput] = useState('');
+  const stepRefs = useRef([]);
+
+  const autoResize = el => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
 
   useEffect(() => {
     apiFetch(`/recipes/${id}`)
@@ -41,6 +49,7 @@ function EditRecipe({ user }) {
           category: recipe.category || '',
           tags:     recipe.tags     || '',
           image_url: recipe.image_url || '',
+          is_public: recipe.is_public ?? true,
           user_id: recipe.user_id || user?.id || user?._id || '',
         });
         setIngredients(
@@ -48,9 +57,18 @@ function EditRecipe({ user }) {
             ? recipe.ingredients.map(i => ({ name: i.name || '', quantity: i.quantity || '', unit: i.unit || '' }))
             : [{ name: '', quantity: '', unit: '' }]
         );
+        setSteps(
+          recipe.instructions
+            ? recipe.instructions.split('\n').filter(s => s.trim())
+            : ['']
+        );
         setLoading(false);
       });
   }, [id]);
+
+  useEffect(() => {
+    if (!loading) stepRefs.current.forEach(autoResize);
+  }, [loading]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -66,6 +84,7 @@ function EditRecipe({ user }) {
     const recipe = {
       ...form,
       ingredients: ingredients.map(ing => ({ name: ing.name, quantity: ing.quantity, unit: ing.unit })),
+      instructions: steps.filter(s => s.trim()).join('\n'),
       prep_time: form.prep_time ? Number(form.prep_time) : undefined,
       cook_time: form.cook_time ? Number(form.cook_time) : undefined,
       servings: form.servings ? Number(form.servings) : undefined,
@@ -113,7 +132,7 @@ function EditRecipe({ user }) {
             Cuisine
             <input type="text" name="cuisine" value={form.cuisine} onChange={handleChange} />
           </label>
-          <div style={{display:'flex',flexDirection:'column',gap:'var(--space-2)',fontSize:'var(--text-xs)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase',color:'var(--text-secondary)',gridColumn:'1/-1'}}>
+          <div className="full-width">
             Category
             <div className="ar-tag-suggestions">
               {SUGGESTED_CATEGORIES.map(cat => (
@@ -124,9 +143,9 @@ function EditRecipe({ user }) {
                 </button>
               ))}
             </div>
-            <input type="text" value={form.category || ''} onChange={e => setForm(f => ({...f, category: e.target.value}))} placeholder="Or type a custom category…" style={{textTransform:'none',letterSpacing:'normal',fontSize:'var(--text-sm)',fontWeight:'normal'}} />
+            <input type="text" value={form.category || ''} onChange={e => setForm(f => ({...f, category: e.target.value}))} placeholder="Or type a custom category…" />
           </div>
-          <div style={{display:'flex',flexDirection:'column',gap:'var(--space-2)',fontSize:'var(--text-xs)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase',color:'var(--text-secondary)'}}>
+          <div className="full-width">
             Tags
             <div className="ar-tag-suggestions">
               {SUGGESTED_TAGS.filter(t => !currentTags.map(x => x.toLowerCase()).includes(t)).map(t => (
@@ -157,7 +176,7 @@ function EditRecipe({ user }) {
             Image URL
             <input type="text" name="image_url" value={form.image_url} onChange={handleChange} />
           </label>
-          <div className="ar-label ar-col-2 ar-toggle-row" style={{gridColumn:'1/-1'}}>
+          <div className="ar-toggle-row full-width">
             <div>
               <span className="ar-toggle-label">Share publicly</span>
               <span className="ar-toggle-sub">Show this recipe on Explore for others to discover</span>
@@ -205,10 +224,29 @@ function EditRecipe({ user }) {
             </button>
           </label>
 
-          <label className="full-width">
+          <div className="full-width">
             Instructions
-            <textarea name="instructions" value={form.instructions} onChange={handleChange} rows={7} />
-          </label>
+            <div className="ar-steps">
+              {steps.map((step, idx) => (
+                <div key={idx} className="ar-step-row">
+                  <span className="ar-step-num">{idx + 1}</span>
+                  <textarea
+                    className="ar-step-input"
+                    ref={el => { stepRefs.current[idx] = el; }}
+                    value={step}
+                    placeholder={`Step ${idx + 1}…`}
+                    onChange={e => { autoResize(e.target); setSteps(steps.map((s, i) => i === idx ? e.target.value : s)); }}
+                  />
+                  {steps.length > 1 && (
+                    <button type="button" className="btn-remove-ingredient"
+                      onClick={() => setSteps(steps.filter((_, i) => i !== idx))}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn-add-ingredient"
+              onClick={() => setSteps([...steps, ''])}>+ Add step</button>
+          </div>
         </div>
 
         <div className="add-recipe-actions">

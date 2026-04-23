@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from database import client, db
-from routers import users, recipes, mealPlans, groceryList, follows, comments
+from routers import users, recipes, mealPlans, groceryList, follows, comments, ratings
 
 app = FastAPI()
 
@@ -22,6 +22,7 @@ app.include_router(mealPlans.router, prefix="/mealPlans", tags=["mealPlans"])
 app.include_router(groceryList.router, prefix="/groceryList", tags=["groceryList"])
 app.include_router(follows.router,     prefix="/follows",     tags=["follows"])
 app.include_router(comments.router,    prefix="/comments",    tags=["comments"])
+app.include_router(ratings.router,     prefix="/ratings",     tags=["ratings"])
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -33,6 +34,10 @@ async def startup_db_client():
         print("MongoDB connection successful")
     except Exception as e:
         print(f"MongoDB connection failed: {e}")
+    from database import ratings_collection
+    await ratings_collection.create_index(
+        [("recipe_id", 1), ("user_id", 1)], unique=True
+    )
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

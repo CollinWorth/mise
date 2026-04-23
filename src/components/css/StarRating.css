@@ -1,0 +1,38 @@
+.star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.star {
+  line-height: 1;
+  transition: color var(--transition), transform 0.1s;
+  user-select: none;
+}
+.star--filled { color: var(--accent); }
+.star--empty  { color: var(--text-tertiary); }
+
+/* Interactive button reset */
+.star-rating--interactive .star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.star-rating--interactive .star:hover,
+.star-rating--interactive .star:hover ~ .star {
+  transform: scale(1.2);
+}
+
+/* Sizes */
+.star-rating--sm .star { font-size: 13px; }
+.star-rating--md .star { font-size: 18px; }
+.star-rating--lg .star { font-size: 22px; }
+
+.star-count {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-left: var(--space-1);
+  font-weight: 500;
+}

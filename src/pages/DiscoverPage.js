@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../api';
+import StarRating from '../components/StarRating';
 import './css/ExplorePage.css';
 import './css/FeedPage.css';
 
@@ -37,14 +38,9 @@ function timeAgo(dateStr) {
 export default function DiscoverPage({ user }) {
   const [tab, setTab] = useState('all'); // 'following' | explore filter tabs
 
-  // Shared like/save state
-  const [likedIds, setLikedIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('mise_liked') || '[]')); }
-    catch { return new Set(); }
-  });
-  const [likeCounts, setLikeCounts] = useState({});
-  const [savedIds, setSavedIds]     = useState(new Set());
-  const [savingId, setSavingId]     = useState(null);
+  // Shared save state
+  const [savedIds, setSavedIds] = useState(new Set());
+  const [savingId, setSavingId] = useState(null);
 
   // Explore state
   const [exploreRecipes, setExploreRecipes] = useState([]);
@@ -73,9 +69,6 @@ export default function DiscoverPage({ user }) {
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         setExploreRecipes(data);
-        const counts = {};
-        data.forEach(r => { counts[r._id || r.id] = r.like_count || 0; });
-        setLikeCounts(c => ({ ...counts, ...c }));
         setExploreLoading(false);
       })
       .catch(() => setExploreLoading(false));
@@ -124,27 +117,11 @@ export default function DiscoverPage({ user }) {
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         setFeedRecipes(data);
-        const counts = {};
-        data.forEach(r => { counts[r._id || r.id] = r.like_count || 0; });
-        setLikeCounts(c => ({ ...c, ...counts }));
         setFeedLoading(false);
         setFeedLoaded(true);
       })
       .catch(() => setFeedLoading(false));
   }, [tab, user, feedLoaded]);
-
-  const persistLiked = useCallback((set) => {
-    localStorage.setItem('mise_liked', JSON.stringify([...set]));
-  }, []);
-
-  const handleLike = async (e, recipeId) => {
-    e.stopPropagation();
-    if (likedIds.has(recipeId)) return;
-    setLikeCounts(prev => ({ ...prev, [recipeId]: (prev[recipeId] || 0) + 1 }));
-    const next = new Set(likedIds); next.add(recipeId);
-    setLikedIds(next); persistLiked(next);
-    try { await apiFetch(`/recipes/${recipeId}/like`, { method: 'POST', body: '{}' }); } catch {}
-  };
 
   const handleSave = async (e, recipeId) => {
     e.stopPropagation();
@@ -170,7 +147,7 @@ export default function DiscoverPage({ user }) {
   // Apply explore filter + search
   let filtered = [...exploreRecipes];
   if (activeFilter === 'trending') {
-    filtered.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
+    filtered.sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
   } else if (activeFilter === 'quick') {
     filtered = filtered.filter(r => { const t = totalMinutes(r); return t > 0 && t <= 30; });
   } else if (activeFilter !== 'all' && activeFilter !== 'new') {
@@ -289,9 +266,7 @@ export default function DiscoverPage({ user }) {
             <div className="feed-posts">
               {feedRecipes.map(recipe => {
                 const id = recipe._id || recipe.id;
-                const liked = likedIds.has(id);
                 const saved = savedIds.has(id);
-                const likeCount = likeCounts[id] ?? 0;
                 const authorInitial = recipe.author_name?.[0]?.toUpperCase() ?? '?';
                 const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
                 return (
@@ -314,12 +289,9 @@ export default function DiscoverPage({ user }) {
                       }
                     </div>
                     <div className="feed-post-actions">
-                      <button className={`feed-action-btn feed-like-btn${liked ? ' feed-like-btn--liked' : ''}`} onClick={e => handleLike(e, id)}>
-                        <svg width="22" height="22" viewBox="0 0 16 16" fill={liked ? 'currentColor' : 'none'}>
-                          <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.567 3.067 2 5 2C6.126 2 7.12 2.557 7.758 3.41L8 3.73L8.242 3.41C8.88 2.557 9.874 2 11 2C12.933 2 14.5 3.567 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z"
-                            stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+                      <div className="feed-action-btn feed-star-display">
+                        <StarRating rating={recipe.avg_rating || 0} showCount count={recipe.rating_count || 0} size="sm" />
+                      </div>
                       <button className="feed-action-btn" onClick={() => navigate(`/recipes/${id}`)}>
                         <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
                           <path d="M14 10C14 10.5523 13.5523 11 13 11H4.5L2 13.5V3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10Z"
@@ -334,7 +306,6 @@ export default function DiscoverPage({ user }) {
                       </button>
                     </div>
                     <div className="feed-post-meta">
-                      {likeCount > 0 && <span className="feed-like-count">{likeCount} {likeCount === 1 ? 'like' : 'likes'}</span>}
                       <div className="feed-post-info" onClick={() => navigate(`/recipes/${id}`)}>
                         <span className="feed-post-title">{recipe.recipe_name}</span>
                         <span className="feed-post-details">
@@ -428,9 +399,7 @@ export default function DiscoverPage({ user }) {
           <div className="ex-grid">
             {filtered.map(recipe => {
               const id = recipe._id || recipe.id;
-              const liked = likedIds.has(id);
               const saved = savedIds.has(id);
-              const count = likeCounts[id] ?? 0;
               const time = fmtTime(recipe);
               const hasImage = recipe.image_url && !failedImages.has(id);
               return (
@@ -469,13 +438,7 @@ export default function DiscoverPage({ user }) {
                         <span className="ex-card-author-name">{recipe.author_name}</span>
                       </a>
                     )}
-                    <button className={`ex-like-btn${liked ? ' ex-like-btn--liked' : ''}`} onClick={e => handleLike(e, id)}>
-                      <svg width="15" height="15" viewBox="0 0 16 16" fill={liked ? 'currentColor' : 'none'}>
-                        <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.567 3.067 2 5 2C6.126 2 7.12 2.557 7.758 3.41L8 3.73L8.242 3.41C8.88 2.557 9.874 2 11 2C12.933 2 14.5 3.567 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z"
-                          stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                      </svg>
-                      <span>{count > 0 ? count : ''}</span>
-                    </button>
+                    <StarRating rating={recipe.avg_rating || 0} showCount count={recipe.rating_count || 0} size="sm" />
                     <button className={`ex-save-btn${saved ? ' ex-save-btn--saved' : ''}`} onClick={e => handleSave(e, id)} disabled={savingId === id}>
                       {savingId === id ? '…' : saved ? '✓ Saved' : '+ Save'}
                     </button>

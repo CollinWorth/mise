@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from bson import ObjectId
-from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection
+from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection, ratings_collection
 from model import Recipe
 from auth import get_current_user_id, get_optional_user_id
 from pydantic import BaseModel
@@ -904,11 +904,13 @@ async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_c
     author_doc = await users_collection.find_one({"_id": source["user_id"]})
     author_name = author_doc.get("name", "Chef") if author_doc else "Chef"
     copy = {k: v for k, v in source.items()
-            if k not in ("_id", "user_id", "like_count", "is_public",
-                         "original_recipe_id", "original_author_name", "is_modified")}
+            if k not in ("_id", "user_id", "like_count", "avg_rating", "rating_count",
+                         "is_public", "original_recipe_id", "original_author_name", "is_modified")}
     copy["user_id"] = ObjectId(user_id)
     copy["is_public"] = False
     copy["like_count"] = 0
+    copy["avg_rating"] = 0.0
+    copy["rating_count"] = 0
     copy["original_recipe_id"] = recipe_id
     copy["original_author_name"] = author_name
     copy["is_modified"] = False
@@ -1002,6 +1004,7 @@ async def delete_recipe(recipe_id: str, user_id: str = Depends(get_current_user_
     if str(existing.get("user_id")) != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     await recipes_collection.delete_one({"_id": ObjectId(recipe_id)})
+    await ratings_collection.delete_many({"recipe_id": recipe_id})
     return {"message": "Recipe deleted successfully"}
 
 

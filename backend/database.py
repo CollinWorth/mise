@@ -16,6 +16,7 @@ mealPlans_collection  = db.mealPlans
 grocery_collection    = db.groceryLists
 follows_collection    = db.follows
 comments_collection   = db.comments
+ratings_collection    = db.ratings
 
 
 
