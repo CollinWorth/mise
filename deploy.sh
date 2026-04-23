@@ -63,7 +63,23 @@ ok "Frontend built"
 step "Restarting services..."
 
 if command -v pm2 &>/dev/null; then
-  pm2 restart api     && ok "Backend restarted"
+  # Activate venv so pip installs land correctly, then restart via PM2
+  VENV_UVICORN=""
+  for p in backend/venv backend/.venv .venv; do
+    if [ -f "$p/bin/uvicorn" ]; then
+      VENV_UVICORN="$(pwd)/$p/bin/uvicorn"
+      break
+    fi
+  done
+
+  if pm2 describe api &>/dev/null; then
+    pm2 restart api && ok "Backend restarted"
+  elif [ -n "$VENV_UVICORN" ]; then
+    pm2 start "$VENV_UVICORN main:app --host 0.0.0.0 --port 8000" --name api --cwd "$(pwd)/backend"
+    pm2 save && ok "Backend started"
+  else
+    err "Could not find uvicorn in venv — activate your venv and run: pm2 start \"\$(which uvicorn) main:app --host 0.0.0.0 --port 8000\" --name api --cwd ~/mise/backend"
+  fi
   pm2 restart frontend && ok "Frontend restarted"
 else
   err "PM2 not found — run: npm install -g pm2"
