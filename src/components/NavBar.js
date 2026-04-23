@@ -8,11 +8,7 @@ function NavBar({ user, onLogout }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
 
-  const [theme, setTheme] = useState(() => {
-    const stored = localStorage.getItem('mise_theme');
-    if (stored) return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const [theme, setTheme] = useState(() => localStorage.getItem('mise_theme') || 'light');
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
