@@ -12,6 +12,7 @@ ok()   { echo -e "${GREEN}✓${NC} $1"; }
 err()  { echo -e "${RED}✗ ERROR:${NC} $1"; exit 1; }
 
 PROJECT_DIR="${HOME}/mise"
+FRONTEND_PORT=3001
 cd "$PROJECT_DIR" || err "Could not cd into $PROJECT_DIR"
 
 # ─── 1. Pull latest code ───────────────────────────────────────────────────────
@@ -80,7 +81,12 @@ if command -v pm2 &>/dev/null; then
   else
     err "Could not find uvicorn in venv — activate your venv and run: pm2 start \"\$(which uvicorn) main:app --host 0.0.0.0 --port 8000\" --name api --cwd ~/mise/backend"
   fi
-  pm2 restart frontend && ok "Frontend restarted"
+  if pm2 describe frontend &>/dev/null; then
+    pm2 restart frontend && ok "Frontend restarted"
+  else
+    pm2 serve build $FRONTEND_PORT --spa --name frontend
+    pm2 save && ok "Frontend started on port $FRONTEND_PORT"
+  fi
 else
   err "PM2 not found — run: npm install -g pm2"
 fi
