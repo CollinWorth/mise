@@ -42,14 +42,14 @@ function App() {
         <Routes>
           <Route path="/" element={user ? <Recipes user={user} /> : <Navigate to="/discover" replace />} />
           <Route path="/calendar" element={<Calendar user={user} />} />
-          <Route path="/recipes" element={<Recipes user={user} />} />
+          <Route path="/recipes" element={user ? <Recipes user={user} /> : <Navigate to="/discover" replace />} />
           <Route path="/recipes/add" element={<AddRecipe user={user} />} />
           <Route path="/recipes/:id/edit" element={<EditRecipe user={user} />} />
           <Route path="/recipes/:id/cook" element={<CookMode />} />
           <Route path="/recipes/:id" element={<RecipeDetails user={user} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/grocery-list" element={<GroceryList user={user} />} />
+          <Route path="/grocery-list" element={user ? <GroceryList user={user} /> : <Navigate to="/login" replace />} />
           <Route path="/discover"   element={<DiscoverPage user={user} />} />
           <Route path="/explore"    element={<DiscoverPage user={user} />} />
           <Route path="/feed"       element={<DiscoverPage user={user} />} />
