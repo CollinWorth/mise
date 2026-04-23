@@ -1,25 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
+import { useToast } from '../contexts/ToastContext';
 import './css/RecipeDetails.css';
 
-const CUISINE_GRADIENTS = {
-  italian:       'linear-gradient(135deg, #8B1A1A 0%, #C0392B 100%)',
-  mexican:       'linear-gradient(135deg, #1A5C2A 0%, #E67E22 100%)',
-  japanese:      'linear-gradient(135deg, #6D1A4A 0%, #C0392B 100%)',
-  chinese:       'linear-gradient(135deg, #8B1A1A 0%, #C0392B 100%)',
-  indian:        'linear-gradient(135deg, #7D4A00 0%, #E67E22 100%)',
-  american:      'linear-gradient(135deg, #1A2A5C 0%, #2C3E50 100%)',
-  french:        'linear-gradient(135deg, #1A1A5C 0%, #2980B9 100%)',
-  thai:          'linear-gradient(135deg, #1A5C2A 0%, #F39C12 100%)',
-  mediterranean: 'linear-gradient(135deg, #1A3A5C 0%, #16A085 100%)',
-  greek:         'linear-gradient(135deg, #1A2A6C 0%, #2980B9 100%)',
-  default:       'linear-gradient(135deg, #2C2C2C 0%, #4A4A4A 100%)',
+const CUISINE_PASTELS = {
+  italian:'#F5EDE8', mexican:'#E9F2E9', japanese:'#F2EDF4',
+  chinese:'#F5EDEC', indian:'#F5F0E8', american:'#EBF0F5',
+  french:'#EEF0F8', thai:'#F3F2E7', mediterranean:'#E8F2EF',
+  greek:'#EDF0F8', korean:'#F4EDF2',
 };
-
-function cuisineGradient(c) {
-  return CUISINE_GRADIENTS[(c || '').toLowerCase()] || CUISINE_GRADIENTS.default;
-}
+const cuisinePastel = c => CUISINE_PASTELS[(c||'').toLowerCase()] || '#F2F0EB';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -36,12 +27,21 @@ function timeAgo(dateStr) {
 export default function RecipeDetails({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [recipe, setRecipe]     = useState(null);
   const [loading, setLoading]   = useState(true);
+  const [servings, setServings] = useState(null);
   const [checked, setChecked]   = useState({});
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [versions, setVersions] = useState([]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+
+  useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
   useEffect(() => {
     Promise.all([
@@ -49,8 +49,17 @@ export default function RecipeDetails({ user }) {
       apiFetch(`/comments/${id}`).then(r => r.ok ? r.json() : []),
     ]).then(([data, cmts]) => {
       setRecipe(data);
+      if (data?.servings) setServings(data.servings);
       setComments(cmts || []);
+      setLikeCount(data?.like_count || 0);
       setLoading(false);
+      if (data?.is_public) {
+        apiFetch(`/recipes/${id}/versions`).then(r => r.ok ? r.json() : []).then(setVersions).catch(() => {});
+        try {
+          const stored = JSON.parse(localStorage.getItem('mise_liked') || '[]');
+          setLiked(stored.includes(id));
+        } catch {}
+      }
     }).catch(() => setLoading(false));
   }, [id]);
 
@@ -76,6 +85,20 @@ export default function RecipeDetails({ user }) {
     } catch {}
   };
 
+  const handleLike = async () => {
+    if (liked) return;
+    setLiked(true);
+    setLikeCount(c => c + 1);
+    try {
+      const stored = JSON.parse(localStorage.getItem('mise_liked') || '[]');
+      if (!stored.includes(id)) { stored.push(id); localStorage.setItem('mise_liked', JSON.stringify(stored)); }
+      await apiFetch(`/recipes/${id}/like`, { method: 'POST', body: '{}' });
+    } catch {
+      setLiked(false);
+      setLikeCount(c => Math.max(0, c - 1));
+    }
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('Delete this recipe?')) return;
     const res = await apiFetch(`/recipes/${id}`, { method: 'DELETE' });
@@ -98,33 +121,66 @@ export default function RecipeDetails({ user }) {
     : [];
 
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const isOwner = user && (user.id === recipe.user_id || user._id === recipe.user_id);
+  const isPublic = recipe.is_public;
+
+  const baseServings = recipe.servings || 1;
+  const scaleFactor  = servings ? servings / baseServings : 1;
+
+  function scaleQty(qty) {
+    if (!qty || scaleFactor === 1) return qty;
+    // Try to parse number from string like "1.5", "1/2", "2"
+    const frac = qty.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (frac) {
+      const n = (parseInt(frac[1]) / parseInt(frac[2])) * scaleFactor;
+      return fmtNum(n);
+    }
+    const n = parseFloat(qty);
+    if (isNaN(n)) return qty;
+    return fmtNum(n * scaleFactor);
+  }
+
+  function fmtNum(n) {
+    if (n === Math.round(n)) return String(Math.round(n));
+    const rounded = Math.round(n * 4) / 4; // nearest quarter
+    const whole = Math.floor(rounded);
+    const frac = rounded - whole;
+    const fracStr = frac === 0.25 ? '¼' : frac === 0.5 ? '½' : frac === 0.75 ? '¾' : '';
+    if (whole === 0) return fracStr || n.toFixed(1);
+    return fracStr ? `${whole} ${fracStr}` : String(whole);
+  }
 
   return (
     <div className="rd-page">
       {/* ── Hero ─────────────────────────────────────────── */}
-      <div className="rd-hero">
-        {recipe.image_url ? (
-          <>
-            <img src={recipe.image_url} alt="" className="rd-hero-blur" aria-hidden="true" />
-            <img src={recipe.image_url} alt={recipe.recipe_name} className="rd-hero-img" />
-          </>
-        ) : (
-          <div className="rd-hero-placeholder" style={{ background: cuisineGradient(recipe.cuisine) }} />
-        )}
-        <div className="rd-hero-overlay" />
-        <div className="rd-hero-content">
-          <button className="rd-back" onClick={() => navigate('/recipes')}>← Recipes</button>
-          <h1 className="rd-title">{recipe.recipe_name}</h1>
+      {(() => {
+        const hasImg = recipe.image_url && !imgError;
+        return (
+        <div className={`rd-hero${hasImg ? '' : ' rd-hero--noimage'}`}>
+          {hasImg ? (
+            <>
+              <img src={recipe.image_url} alt="" className="rd-hero-blur" aria-hidden="true" onError={() => setImgError(true)} />
+              <img src={recipe.image_url} alt={recipe.recipe_name} className="rd-hero-img" onError={() => setImgError(true)} />
+            </>
+          ) : (
+            <div className="rd-hero-placeholder" style={{ background: cuisinePastel(recipe.cuisine) }} />
+          )}
+          {hasImg && <div className="rd-hero-overlay" />}
+          <div className="rd-hero-content">
+            <button className="rd-back" onClick={() => navigate('/recipes')}>← Recipes</button>
+            <h1 className="rd-title">{recipe.recipe_name}</h1>
           <div className="rd-meta-row">
-            {recipe.prep_time > 0 && <span className="rd-meta-pill">Prep {recipe.prep_time}m</span>}
-            {recipe.cook_time > 0 && <span className="rd-meta-pill">Cook {recipe.cook_time}m</span>}
-            {totalTime > 0        && <span className="rd-meta-pill rd-meta-total">Total {totalTime}m</span>}
-            {recipe.servings      && <span className="rd-meta-pill">Serves {recipe.servings}</span>}
-            {recipe.category      && <span className="rd-meta-pill rd-meta-category">{recipe.category}</span>}
-            {recipe.cuisine       && <span className="rd-meta-pill rd-meta-accent">{recipe.cuisine}</span>}
+              {recipe.prep_time > 0 && <span className="rd-meta-pill">Prep {recipe.prep_time}m</span>}
+              {recipe.cook_time > 0 && <span className="rd-meta-pill">Cook {recipe.cook_time}m</span>}
+              {totalTime > 0        && <span className="rd-meta-pill rd-meta-total">Total {totalTime}m</span>}
+              {recipe.servings      && <span className="rd-meta-pill">Serves {recipe.servings}</span>}
+              {recipe.category      && <span className="rd-meta-pill rd-meta-category">{recipe.category}</span>}
+              {recipe.cuisine       && <span className="rd-meta-pill rd-meta-accent">{recipe.cuisine}</span>}
+            </div>
           </div>
         </div>
-      </div>
+        );
+      })()}
 
       <div className="rd-body page">
         {/* ── Tags ─────────────────────────────────────────── */}
@@ -136,17 +192,46 @@ export default function RecipeDetails({ user }) {
           </div>
         )}
 
-        {/* ── Cook mode button ─────────────────────────────── */}
-        {steps.length > 0 && (
-          <button className="rd-cook-btn" onClick={() => navigate(`/recipes/${id}/cook`)}>
-            <span>🍳</span> Start Cook Mode
-          </button>
+        {/* ── Provenance ───────────────────────────────────── */}
+        {recipe.is_modified && recipe.original_author_name && (
+          <div className="rd-provenance">
+            <span className="rd-provenance-icon">↪</span>
+            <span>Modified from original by <strong>{recipe.original_author_name}</strong></span>
+          </div>
         )}
 
-        <div className="rd-content">
+        {/* ── Versions ─────────────────────────────────────── */}
+        {versions.length > 0 && (
+          <div className="rd-versions">
+            <button className="rd-versions-toggle" onClick={() => setShowVersions(v => !v)}>
+              {showVersions ? '▾' : '▸'} {versions.length} remix{versions.length !== 1 ? 'es' : ''} of this recipe
+            </button>
+            {showVersions && (
+              <ul className="rd-versions-list">
+                {versions.map(v => (
+                  <li key={v._id} className="rd-version-item" onClick={() => navigate(`/recipes/${v._id}`)}>
+                    <span className="rd-version-name">{v.recipe_name}</span>
+                    <span className="rd-version-by">by {v.author_name}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+<div className="rd-content">
           {/* ── Ingredients ──────────────────────────────── */}
           <div className="rd-panel">
-            <h2 className="rd-panel-title">Ingredients</h2>
+            <div className="rd-panel-header">
+              <h2 className="rd-panel-title">Ingredients</h2>
+              {recipe.servings && (
+                <div className="rd-servings">
+                  <button className="rd-servings-btn" onClick={() => setServings(s => Math.max(1, (s ?? baseServings) - 1))}>−</button>
+                  <span className="rd-servings-label">{servings ?? baseServings} serving{(servings ?? baseServings) !== 1 ? 's' : ''}</span>
+                  <button className="rd-servings-btn" onClick={() => setServings(s => (s ?? baseServings) + 1)}>+</button>
+                </div>
+              )}
+            </div>
             <ul className="rd-ing-list">
               {recipe.ingredients.map((ing, idx) => (
                 <li
@@ -156,7 +241,7 @@ export default function RecipeDetails({ user }) {
                 >
                   <span className="rd-ing-check">{checked[idx] ? '✓' : ''}</span>
                   <span className="rd-ing-text">
-                    {[ing.quantity, ing.unit, ing.name].filter(Boolean).join(' ')}
+                    {[scaleQty(ing.quantity), ing.unit, ing.name].filter(Boolean).join(' ')}
                   </span>
                 </li>
               ))}
@@ -181,8 +266,39 @@ export default function RecipeDetails({ user }) {
 
         {/* ── Actions ──────────────────────────────────────── */}
         <div className="rd-actions">
-          <button className="btn-ghost" onClick={() => navigate(`/recipes/${id}/edit`)}>Edit recipe</button>
-          <button className="btn-danger" onClick={handleDelete}>Delete</button>
+          {steps.length > 0 && (
+            <button className="btn-primary" onClick={() => navigate(`/recipes/${id}/cook`)}>
+              Start Cooking
+            </button>
+          )}
+          {isPublic && (
+            <button
+              className={`rd-like-btn${liked ? ' rd-like-btn--liked' : ''}`}
+              onClick={handleLike}
+              title={liked ? 'Liked' : 'Like this recipe'}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill={liked ? 'currentColor' : 'none'}>
+                <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.567 3.067 2 5 2C6.126 2 7.12 2.557 7.758 3.41L8 3.73L8.242 3.41C8.88 2.557 9.874 2 11 2C12.933 2 14.5 3.567 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z"
+                  stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+              </svg>
+              {likeCount > 0 && <span>{likeCount}</span>}
+            </button>
+          )}
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              toast.info('Link copied to clipboard');
+            }}
+          >
+            Share
+          </button>
+          {isOwner && (
+            <>
+              <button className="btn-ghost" onClick={() => navigate(`/recipes/${id}/edit`)}>Edit recipe</button>
+              <button className="btn-danger" onClick={handleDelete}>Delete</button>
+            </>
+          )}
         </div>
 
         {/* ── Comments ─────────────────────────────────────── */}

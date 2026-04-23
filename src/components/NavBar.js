@@ -8,6 +8,17 @@ function NavBar({ user, onLogout }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
 
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('mise_theme');
+    if (stored) return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('mise_theme', theme);
+  }, [theme]);
+
   useEffect(() => {
     const handler = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
@@ -29,13 +40,20 @@ function NavBar({ user, onLogout }) {
       <div className="nav-inner">
         <Link to="/" className="nav-logo">mise</Link>
         <div className="nav-links">
-          {user && <NavLink to="/feed"         current={location.pathname}>Feed</NavLink>}
+          <NavLink to="/discover" current={location.pathname}>Discover</NavLink>
           {user && <NavLink to="/recipes"      current={location.pathname}>Recipes</NavLink>}
-          {user && <NavLink to="/explore"      current={location.pathname}>Explore</NavLink>}
           {user && <NavLink to="/calendar"     current={location.pathname}>Planner</NavLink>}
           {user && <NavLink to="/grocery-list" current={location.pathname}>Grocery</NavLink>}
           {!user && <NavLink to="/login"    current={location.pathname}>Login</NavLink>}
           {!user && <NavLink to="/register" current={location.pathname}>Register</NavLink>}
+          <button
+            className="nav-theme-toggle"
+            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+            aria-label="Toggle dark mode"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? '☀' : '☾'}
+          </button>
           {user && (
             <>
               <div className="nav-divider" />
@@ -57,6 +75,13 @@ function NavBar({ user, onLogout }) {
                     >
                       Profile
                     </Link>
+                    <Link
+                      to="/settings"
+                      className="nav-dropdown-item"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      Settings
+                    </Link>
                     <button className="nav-dropdown-item nav-dropdown-signout" onClick={handleLogout}>
                       Sign out
                     </button>
@@ -71,8 +96,10 @@ function NavBar({ user, onLogout }) {
   );
 }
 
+const DISCOVER_ALIASES = ['/discover', '/explore', '/feed'];
 function NavLink({ to, current, children }) {
-  const active = current === to || (to !== '/' && current.startsWith(to));
+  const isDiscover = to === '/discover' && DISCOVER_ALIASES.includes(current);
+  const active = isDiscover || current === to || (to !== '/' && current.startsWith(to));
   return (
     <Link to={to} className={`nav-link${active ? ' nav-link--active' : ''}`}>
       {children}

@@ -1,43 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import './css/Recipes.css';
 import './css/ProfilePage.css';
 
-const CUISINE_GRADIENTS = {
-  italian:'linear-gradient(135deg,#8B1A1A 0%,#C0392B 100%)',
-  mexican:'linear-gradient(135deg,#1A5C2A 0%,#E67E22 100%)',
-  japanese:'linear-gradient(135deg,#6D1A4A 0%,#C0392B 100%)',
-  chinese:'linear-gradient(135deg,#8B1A1A 0%,#C0392B 100%)',
-  indian:'linear-gradient(135deg,#7D4A00 0%,#E67E22 100%)',
-  american:'linear-gradient(135deg,#1A2A5C 0%,#2C3E50 100%)',
-  french:'linear-gradient(135deg,#1A1A5C 0%,#2980B9 100%)',
-  thai:'linear-gradient(135deg,#1A5C2A 0%,#F39C12 100%)',
-  mediterranean:'linear-gradient(135deg,#1A3A5C 0%,#16A085 100%)',
-  greek:'linear-gradient(135deg,#1A2A6C 0%,#2980B9 100%)',
-  default:'linear-gradient(135deg,#2C2C2C 0%,#4A4A4A 100%)',
+const CUISINE_PASTELS = {
+  italian:'#F5EDE8', mexican:'#E9F2E9', japanese:'#F2EDF4',
+  chinese:'#F5EDEC', indian:'#F5F0E8', american:'#EBF0F5',
+  french:'#EEF0F8', thai:'#F3F2E7', mediterranean:'#E8F2EF',
+  greek:'#EDF0F8', korean:'#F4EDF2',
 };
-const cuisineGradient = c => CUISINE_GRADIENTS[(c||'').toLowerCase()] || CUISINE_GRADIENTS.default;
+const cuisinePastel = c => CUISINE_PASTELS[(c||'').toLowerCase()] || '#F2F0EB';
 const totalTime = r => { const t = (r.prep_time||0)+(r.cook_time||0); return t > 0 ? `${t}m` : null; };
 
 export default function ProfilePage({ user, onLogout }) {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [followerCount, setFollowerCount]   = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
     const uid = user.id || user._id;
-    apiFetch(`/recipes/user/${uid}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { setRecipes(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      apiFetch(`/recipes/user/${uid}`).then(r => r.ok ? r.json() : []),
+      apiFetch(`/users/${uid}`).then(r => r.ok ? r.json() : {}),
+    ]).then(([data, profile]) => {
+      setRecipes(data);
+      setFollowerCount(profile.follower_count ?? 0);
+      setFollowingCount(profile.following_count ?? 0);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, [user]);
 
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
   const initial = user.name?.[0]?.toUpperCase() ?? '?';
   const publicCount = recipes.filter(r => r.is_public).length;
@@ -59,6 +56,14 @@ export default function ProfilePage({ user, onLogout }) {
             <div className="pf-stat">
               <span className="pf-stat-num">{publicCount}</span>
               <span className="pf-stat-label">public</span>
+            </div>
+            <div className="pf-stat">
+              <span className="pf-stat-num">{followerCount}</span>
+              <span className="pf-stat-label">followers</span>
+            </div>
+            <div className="pf-stat">
+              <span className="pf-stat-num">{followingCount}</span>
+              <span className="pf-stat-label">following</span>
             </div>
           </div>
         </div>
@@ -89,7 +94,7 @@ export default function ProfilePage({ user, onLogout }) {
               <div className="recipe-card-img">
                 {recipe.image_url
                   ? <img src={recipe.image_url} alt={recipe.recipe_name} />
-                  : <div className="recipe-placeholder" style={{background:cuisineGradient(recipe.cuisine)}} />
+                  : <div className="recipe-placeholder" style={{background:cuisinePastel(recipe.cuisine)}} />
                 }
                 <div className="recipe-card-overlay">
                   <div className="recipe-card-tags">

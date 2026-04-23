@@ -9,7 +9,8 @@ const _kBorder = Color(0xFFE5E2DC);
 
 class SocialScreen extends StatefulWidget {
   final Map<String, dynamic> user;
-  const SocialScreen({super.key, required this.user});
+  final VoidCallback? onRecipeSaved;
+  const SocialScreen({super.key, required this.user, this.onRecipeSaved});
 
   @override
   State<SocialScreen> createState() => _SocialScreenState();
@@ -17,11 +18,17 @@ class SocialScreen extends StatefulWidget {
 
 class _SocialScreenState extends State<SocialScreen> {
   int _tab = 0; // 0 = Feed, 1 = Explore, 2 = People
+  final _feedKey = GlobalKey<FeedScreenState>();
 
   @override
   Widget build(BuildContext context) {
+    final bg        = Theme.of(context).scaffoldBackgroundColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final surface   = Theme.of(context).colorScheme.surface;
+    final border    = Theme.of(context).dividerColor;
+
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: bg,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -32,11 +39,11 @@ class _SocialScreenState extends State<SocialScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Row(
                 children: [
-                  _pill('Feed', 0),
+                  _pill('Feed',    0, onSurface, surface, border),
                   const SizedBox(width: 8),
-                  _pill('Explore', 1),
+                  _pill('Explore', 1, onSurface, surface, border),
                   const SizedBox(width: 8),
-                  _pill('People', 2),
+                  _pill('People',  2, onSurface, surface, border),
                 ],
               ),
             ),
@@ -46,9 +53,12 @@ class _SocialScreenState extends State<SocialScreen> {
               child: IndexedStack(
                 index: _tab,
                 children: [
-                  FeedScreen(user: widget.user, embedded: true),
-                  ExploreScreen(user: widget.user, embedded: true),
-                  UserSearchScreen(currentUser: widget.user),
+                  FeedScreen(key: _feedKey, user: widget.user, embedded: true),
+                  ExploreScreen(user: widget.user, embedded: true, onRecipeSaved: widget.onRecipeSaved),
+                  UserSearchScreen(
+                    currentUser: widget.user,
+                    onFollowChanged: () => _feedKey.currentState?.reload(),
+                  ),
                 ],
               ),
             ),
@@ -58,7 +68,7 @@ class _SocialScreenState extends State<SocialScreen> {
     );
   }
 
-  Widget _pill(String label, int index) {
+  Widget _pill(String label, int index, Color onSurface, Color surface, Color border) {
     final active = _tab == index;
     return GestureDetector(
       onTap: () => setState(() => _tab = index),
@@ -66,16 +76,16 @@ class _SocialScreenState extends State<SocialScreen> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? _kDark : Colors.white,
+          color: active ? onSurface : surface,
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: active ? _kDark : _kBorder, width: 1.5),
+          border: Border.all(color: active ? onSurface : border, width: 1.5),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: active ? Colors.white : const Color(0xFF555250),
+            color: active ? surface : onSurface.withOpacity(0.6),
           ),
         ),
       ),

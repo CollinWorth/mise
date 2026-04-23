@@ -4,20 +4,13 @@ import { apiFetch } from '../api';
 import './css/UserProfilePage.css';
 import './css/Recipes.css';
 
-const CUISINE_GRADIENTS = {
-  italian:'linear-gradient(135deg,#8B1A1A,#C0392B)',
-  mexican:'linear-gradient(135deg,#1A5C2A,#E67E22)',
-  japanese:'linear-gradient(135deg,#6D1A4A,#C0392B)',
-  chinese:'linear-gradient(135deg,#8B1A1A,#C0392B)',
-  indian:'linear-gradient(135deg,#7D4A00,#E67E22)',
-  american:'linear-gradient(135deg,#1A2A5C,#2C3E50)',
-  french:'linear-gradient(135deg,#1A1A5C,#2980B9)',
-  thai:'linear-gradient(135deg,#1A5C2A,#F39C12)',
-  mediterranean:'linear-gradient(135deg,#1A3A5C,#16A085)',
-  greek:'linear-gradient(135deg,#1A2A6C,#2980B9)',
-  default:'linear-gradient(135deg,#2C2C2C,#4A4A4A)',
+const CUISINE_PASTELS = {
+  italian:'#F5EDE8', mexican:'#E9F2E9', japanese:'#F2EDF4',
+  chinese:'#F5EDEC', indian:'#F5F0E8', american:'#EBF0F5',
+  french:'#EEF0F8', thai:'#F3F2E7', mediterranean:'#E8F2EF',
+  greek:'#EDF0F8', korean:'#F4EDF2',
 };
-const cuisineGradient = c => CUISINE_GRADIENTS[(c||'').toLowerCase()] || CUISINE_GRADIENTS.default;
+const cuisinePastel = c => CUISINE_PASTELS[(c||'').toLowerCase()] || '#F2F0EB';
 const totalTime = r => { const t = (r.prep_time||0)+(r.cook_time||0); return t > 0 ? `${t}m` : null; };
 
 export default function UserProfilePage({ user: currentUser }) {
@@ -125,7 +118,7 @@ export default function UserProfilePage({ user: currentUser }) {
               <div className="recipe-card-img">
                 {recipe.image_url
                   ? <img src={recipe.image_url} alt={recipe.recipe_name} />
-                  : <div className="recipe-placeholder" style={{background: cuisineGradient(recipe.cuisine)}} />
+                  : <div className="recipe-placeholder" style={{background: cuisinePastel(recipe.cuisine)}} />
                 }
                 <div className="recipe-card-overlay">
                   <div className="recipe-card-tags">

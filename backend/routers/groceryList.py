@@ -21,10 +21,54 @@ def convert_object_ids(doc):
         return doc
 
 
+def _fmt_qty(n: float) -> str:
+    """Format a float quantity to a clean string (e.g. 2.0 → '2', 1.5 → '1.5')."""
+    if n == int(n):
+        return str(int(n))
+    return str(round(n, 2))
+
+
 class FromMealPlanRequest(BaseModel):
     user_id: str
-    start_date: str  # YYYY-MM-DD
-    end_date: str    # YYYY-MM-DD
+    start_date: str | None = None   # YYYY-MM-DD (used if recipe_ids not provided)
+    end_date: str | None = None     # YYYY-MM-DD
+    recipe_ids: list[str] | None = None  # explicit IDs, may include duplicates
+
+
+@router.get("/week-meals")
+async def get_week_meals(user_id: str, start_date: str, end_date: str):
+    """Return all planned meals for a week range, enriched with recipe name."""
+    try:
+        user_obj_id = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+    dates = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+    plans = await mealPlans_collection.find({
+        "user_id": user_obj_id, "date": {"$in": dates}
+    }).to_list(length=None)
+    results = []
+    for plan in plans:
+        recipe_name, image_url, servings = "Unknown recipe", "", 0
+        try:
+            r = await recipes_collection.find_one({"_id": plan["recipe_id"]})
+            if r:
+                recipe_name = r.get("recipe_name", "Unknown recipe")
+                image_url = r.get("image_url", "") or ""
+                servings = int(r.get("servings") or 0)
+        except Exception:
+            pass
+        results.append({
+            "meal_plan_id": str(plan["_id"]),
+            "recipe_id": str(plan["recipe_id"]),
+            "recipe_name": recipe_name,
+            "image_url": image_url,
+            "date": plan["date"],
+            "servings": servings,
+        })
+    return results
+
 
 @router.post("/from-meal-plan")
 async def generate_from_meal_plan(body: FromMealPlanRequest):
@@ -33,52 +77,74 @@ async def generate_from_meal_plan(body: FromMealPlanRequest):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user_id")
 
-    # Build list of dates in range
-    start = date.fromisoformat(body.start_date)
-    end = date.fromisoformat(body.end_date)
-    dates = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+    # Build recipe_id list — keeps duplicates so quantities multiply correctly
+    if body.recipe_ids:
+        recipe_id_list = body.recipe_ids
+    elif body.start_date and body.end_date:
+        start = date.fromisoformat(body.start_date)
+        end = date.fromisoformat(body.end_date)
+        dates = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+        plans = await mealPlans_collection.find({
+            "user_id": user_obj_id, "date": {"$in": dates}
+        }).to_list(length=None)
+        if not plans:
+            return {"added": 0, "message": "No meals planned for this week"}
+        recipe_id_list = [str(p["recipe_id"]) for p in plans]  # intentional duplicates
+    else:
+        raise HTTPException(status_code=400, detail="Provide recipe_ids or start_date/end_date")
 
-    # Fetch all meal plans in range
-    plans = await mealPlans_collection.find({
-        "user_id": user_obj_id,
-        "date": {"$in": dates}
-    }).to_list(length=None)
+    if not recipe_id_list:
+        return {"added": 0, "message": "No meals to process"}
 
-    if not plans:
-        return {"added": 0, "message": "No meals planned for this week"}
+    # Count how many times each recipe appears (for quantity multiplication)
+    recipe_count: dict[str, int] = {}
+    for rid in recipe_id_list:
+        recipe_count[rid] = recipe_count.get(rid, 0) + 1
 
-    # Get unique recipe ids
-    recipe_ids = list({str(p["recipe_id"]) for p in plans})
-
-    # Fetch recipes
-    recipes = []
-    for rid in recipe_ids:
+    # Fetch unique recipes
+    recipes_by_id: dict[str, dict] = {}
+    for rid in recipe_count:
         try:
             r = await recipes_collection.find_one({"_id": ObjectId(rid)})
             if r:
-                recipes.append(r)
+                recipes_by_id[rid] = r
         except Exception:
             pass
 
-    # Aggregate ingredients
-    aggregated = {}  # name.lower() -> {name, quantity, unit, category}
-    for recipe in recipes:
+    # Aggregate ingredients, multiplying quantities by occurrence count
+    aggregated: dict[str, dict] = {}
+    for rid, count in recipe_count.items():
+        recipe = recipes_by_id.get(rid)
+        if not recipe:
+            continue
         for ing in recipe.get("ingredients", []):
             key = ing.get("name", "").strip().lower()
             if not key:
                 continue
+            try:
+                ing_qty = float(ing.get("quantity") or 0) * count
+            except (ValueError, TypeError):
+                ing_qty = 0
+
             if key in aggregated:
-                # Try to combine quantities numerically
                 try:
                     existing_qty = float(aggregated[key]["quantity"] or 0)
-                    new_qty = float(ing.get("quantity") or 0)
-                    aggregated[key]["quantity"] = str(existing_qty + new_qty)
+                    combined = existing_qty + ing_qty
+                    if combined > 0:
+                        aggregated[key]["quantity"] = _fmt_qty(combined)
                 except (ValueError, TypeError):
-                    pass  # Keep existing if can't combine
+                    pass
             else:
+                raw_qty = ing.get("quantity")
+                if ing_qty and raw_qty:
+                    qty_str = _fmt_qty(ing_qty)
+                elif raw_qty:
+                    qty_str = str(raw_qty)
+                else:
+                    qty_str = ""
                 aggregated[key] = {
                     "name": ing.get("name", "").strip(),
-                    "quantity": str(ing.get("quantity", "")) if ing.get("quantity") else "",
+                    "quantity": qty_str,
                     "unit": ing.get("unit", "") or "",
                     "category": "other",
                     "checked": False,
@@ -91,25 +157,41 @@ async def generate_from_meal_plan(body: FromMealPlanRequest):
     grocery_list = await grocery_collection.find_one({"user_id": user_obj_id})
     if not grocery_list:
         result = await grocery_collection.insert_one({
-            "user_id": user_obj_id,
-            "name": "My List",
-            "items": []
+            "user_id": user_obj_id, "name": "My List", "items": []
         })
         grocery_list = await grocery_collection.find_one({"_id": result.inserted_id})
 
     list_id = grocery_list["_id"]
     existing_names = {i.get("name", "").lower() for i in grocery_list.get("items", [])}
 
-    # Add only items not already in the list
-    new_items = [v for k, v in aggregated.items() if k not in existing_names]
+    # Merge: if item already exists in list, try to combine quantities
+    to_add = []
+    to_update = []  # (name, new_qty)
+    for key, item in aggregated.items():
+        if key in existing_names:
+            existing = next((i for i in grocery_list.get("items", []) if i.get("name", "").lower() == key), None)
+            if existing:
+                try:
+                    combined = float(existing.get("quantity") or 0) + float(item["quantity"] or 0)
+                    if combined > 0:
+                        to_update.append((existing["name"], _fmt_qty(combined)))
+                except (ValueError, TypeError):
+                    pass  # Don't update if can't combine
+        else:
+            to_add.append(item)
 
-    if new_items:
+    if to_add:
         await grocery_collection.update_one(
             {"_id": list_id},
-            {"$push": {"items": {"$each": new_items}}}
+            {"$push": {"items": {"$each": to_add}}}
+        )
+    for name, new_qty in to_update:
+        await grocery_collection.update_one(
+            {"_id": list_id, "items.name": name},
+            {"$set": {"items.$.quantity": new_qty}}
         )
 
-    return {"added": len(new_items), "skipped": len(aggregated) - len(new_items)}
+    return {"added": len(to_add), "updated": len(to_update), "skipped": len(aggregated) - len(to_add) - len(to_update)}
 
 
 # Create a new grocery list
@@ -154,45 +236,84 @@ async def get_grocery_list_listID(grocery_list_id: str):
 # Add a new grocery item to the list (or update quantity if item exists)
 @router.put("/{grocery_list_id}")
 async def add_grocery_item(grocery_list_id: str, item: GroceryItem):
-    grocery_list = await grocery_collection.find_one({"_id": ObjectId(grocery_list_id)})
+    try:
+        obj_id = ObjectId(grocery_list_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid grocery list ID")
+    grocery_list = await grocery_collection.find_one({"_id": obj_id})
     if not grocery_list:
         raise HTTPException(status_code=404, detail="Grocery list not found")
 
-    # Check if item with the same name already exists
     existing_items = grocery_list.get("items", [])
     for existing_item in existing_items:
         if existing_item.get("name") == item.name:
-            new_quantity = int(existing_item.get("quantity", 1)) + int(item.quantity)
-            result = await grocery_collection.update_one(
-                {"_id": ObjectId(grocery_list_id), "items.name": item.name},
-                {"$set": {"items.$.quantity": new_quantity}}
+            # Combine quantities safely — both may be fractions or empty
+            try:
+                combined = float(existing_item.get("quantity") or 0) + float(item.quantity or 0)
+                new_qty = _fmt_qty(combined) if combined > 0 else (existing_item.get("quantity") or "")
+            except (ValueError, TypeError):
+                new_qty = existing_item.get("quantity") or item.quantity or ""
+            await grocery_collection.update_one(
+                {"_id": obj_id, "items.name": item.name},
+                {"$set": {"items.$.quantity": new_qty}}
             )
-            return {"message": f"Updated quantity of '{item.name}' to {new_quantity}"}
+            return {"message": f"Updated '{item.name}'", "quantity": new_qty}
 
-    # If item doesn't exist, add it to the list
+    # New item — push to list
     item_dict = item.dict(by_alias=True)
-    result = await grocery_collection.update_one(
-        {"_id": ObjectId(grocery_list_id)},
+    await grocery_collection.update_one(
+        {"_id": obj_id},
         {"$push": {"items": item_dict}}
     )
-    return {"message": f"Added new item '{item.name}'", "item": item_dict}
+    return {"message": f"Added '{item.name}'", "item": item_dict}
+
 
 # Toggle checked state of an item
 @router.patch("/{grocery_list_id}/{item_name}/check")
 async def toggle_grocery_item(grocery_list_id: str, item_name: str):
-    grocery_list = await grocery_collection.find_one({"_id": ObjectId(grocery_list_id)})
+    try:
+        obj_id = ObjectId(grocery_list_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid grocery list ID")
+    grocery_list = await grocery_collection.find_one({"_id": obj_id})
     if not grocery_list:
         raise HTTPException(status_code=404, detail="Grocery list not found")
     items = grocery_list.get("items", [])
+    # Case-insensitive fallback so minor name drift doesn't break toggling
     current = next((i for i in items if i.get("name") == item_name), None)
     if current is None:
+        current = next((i for i in items if i.get("name", "").lower() == item_name.lower()), None)
+    if current is None:
         raise HTTPException(status_code=404, detail="Item not found")
+    stored_name = current["name"]
     new_checked = not current.get("checked", False)
     await grocery_collection.update_one(
-        {"_id": ObjectId(grocery_list_id), "items.name": item_name},
+        {"_id": obj_id, "items.name": stored_name},
         {"$set": {"items.$.checked": new_checked}}
     )
     return {"checked": new_checked}
+
+
+# Clear all items (or just checked items) from a list in one query
+@router.delete("/{grocery_list_id}")
+async def clear_grocery_items(grocery_list_id: str, checked_only: bool = False):
+    try:
+        obj_id = ObjectId(grocery_list_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid grocery list ID")
+    if checked_only:
+        result = await grocery_collection.update_one(
+            {"_id": obj_id},
+            {"$pull": {"items": {"checked": True}}}
+        )
+    else:
+        result = await grocery_collection.update_one(
+            {"_id": obj_id},
+            {"$set": {"items": []}}
+        )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Grocery list not found")
+    return {"cleared": True}
 
 
 # Delete a grocery item by name from the list

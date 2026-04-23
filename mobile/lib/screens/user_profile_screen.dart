@@ -6,9 +6,6 @@ import 'follow_list_screen.dart';
 import 'public_recipe_detail_screen.dart';
 
 const _kAccent = Color(0xFFE8622A);
-const _kBg = Color(0xFFF7F6F3);
-const _kBorder = Color(0xFFE5E2DC);
-const _kTextSec = Color(0xFF888480);
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -89,13 +86,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (mounted) setState(() => _followLoading = false);
   }
 
+  static const _pastels = {
+    'italian': Color(0xFFF5EDE8), 'mexican': Color(0xFFE9F2E9),
+    'japanese': Color(0xFFF2EDF4), 'chinese': Color(0xFFF5EDEC),
+    'indian': Color(0xFFF5F0E8), 'american': Color(0xFFEBF0F5),
+    'french': Color(0xFFEEF0F8), 'thai': Color(0xFFF3F2E7),
+    'mediterranean': Color(0xFFE8F2EF), 'greek': Color(0xFFEDF0F8),
+    'korean': Color(0xFFF4EDF2),
+  };
+
   @override
   Widget build(BuildContext context) {
+    final bg      = Theme.of(context).scaffoldBackgroundColor;
+    final surface = Theme.of(context).colorScheme.surface;
+    final border  = Theme.of(context).dividerColor;
+    final tp      = Theme.of(context).colorScheme.onSurface;
+    final ts      = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+    final dark    = Theme.of(context).brightness == Brightness.dark;
+
     if (_loading) {
       return Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: bg,
         appBar: AppBar(
-          backgroundColor: _kBg,
+          backgroundColor: bg,
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new, size: 18),
@@ -112,14 +125,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final recipeCount = (_profile?['public_recipe_count'] as num?)?.toInt() ?? _recipes.length;
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: bg,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: _kBg,
+            backgroundColor: bg,
             elevation: 0,
-            title: Text(name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            iconTheme: IconThemeData(color: tp),
+            title: Text(name, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: tp)),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new, size: 18),
               onPressed: () => Navigator.pop(context),
@@ -139,40 +153,44 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white))),
                   ),
                   const SizedBox(height: 12),
-                  Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                  Text(name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: tp)),
                   const SizedBox(height: 20),
 
                   // Stats row
                   Row(
                     children: [
-                      _statCol('$recipeCount', 'Recipes'),
-                      _statDivider(),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => FollowListScreen(
-                              userId: widget.userId,
-                              type: 'followers',
-                              currentUser: widget.currentUser,
+                      Expanded(child: _statCol('$recipeCount', 'Recipes', ts)),
+                      _statDivider(border),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FollowListScreen(
+                                userId: widget.userId,
+                                type: 'followers',
+                                currentUser: widget.currentUser,
+                              ),
                             ),
                           ),
+                          child: _statCol('$_followerCount', 'Followers', ts),
                         ),
-                        child: _statCol('$_followerCount', 'Followers'),
                       ),
-                      _statDivider(),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => FollowListScreen(
-                              userId: widget.userId,
-                              type: 'following',
-                              currentUser: widget.currentUser,
+                      _statDivider(border),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FollowListScreen(
+                                userId: widget.userId,
+                                type: 'following',
+                                currentUser: widget.currentUser,
+                              ),
                             ),
                           ),
+                          child: _statCol('$followingCount', 'Following', ts),
                         ),
-                        child: _statCol('$followingCount', 'Following'),
                       ),
                     ],
                   ),
@@ -214,11 +232,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
           // Recipe grid
           if (_recipes.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text('No public recipes yet', style: TextStyle(fontSize: 14, color: _kTextSec)),
+                  padding: const EdgeInsets.all(32),
+                  child: Text('No public recipes yet', style: TextStyle(fontSize: 14, color: ts)),
                 ),
               ),
             )
@@ -233,36 +251,66 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   (_, i) {
                     final r = _recipes[i];
                     final imageUrl = r['image_url'] as String?;
-                    final name = r['recipe_name'] as String? ?? '';
+                    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+                    final recipeName = r['recipe_name'] as String? ?? '';
                     final cuisine = r['cuisine'] as String? ?? '';
+                    final category = r['category'] as String? ?? '';
+                    final pastelBase = _pastels[cuisine.toLowerCase()] ?? const Color(0xFFF2F0EB);
+                    final cardBg = hasImage
+                        ? surface
+                        : (dark ? Color.lerp(pastelBase, const Color(0xFF1A1918), 0.72)! : pastelBase);
+                    final textOnCard = dark ? Colors.white.withOpacity(0.85) : const Color(0xFF1A1918);
+
                     return GestureDetector(
                       onTap: () => Navigator.push(context, MaterialPageRoute(
                         builder: (_) => PublicRecipeDetailScreen(recipe: r, user: widget.currentUser))),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: _kBorder, width: 1.5),
+                          border: hasImage ? Border.all(color: border, width: 1.5) : null,
                         ),
                         clipBehavior: Clip.hardEdge,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: imageUrl != null && imageUrl.isNotEmpty
-                                  ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover, width: double.infinity)
-                                  : Container(
-                                      color: const Color(0xFFF0EEE9),
-                                      child: Center(child: Text(_emoji(cuisine), style: const TextStyle(fontSize: 32))),
-                                    ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                maxLines: 2, overflow: TextOverflow.ellipsis),
-                            ),
-                          ],
-                        ),
+                        child: hasImage
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: CachedNetworkImage(
+                                    imageUrl: imageUrl!, fit: BoxFit.cover, width: double.infinity)),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text(recipeName,
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: tp),
+                                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  ),
+                                ],
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (category.isNotEmpty || cuisine.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: textOnCard.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(99),
+                                        ),
+                                        child: Text(
+                                          category.isNotEmpty ? category : cuisine,
+                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                                            color: textOnCard.withOpacity(0.55)),
+                                          overflow: TextOverflow.ellipsis),
+                                      ),
+                                    const Spacer(),
+                                    Text(recipeName,
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                                        color: textOnCard, height: 1.2),
+                                      maxLines: 3, overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
                       ),
                     );
                   },
@@ -275,21 +323,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _statCol(String value, String label) {
-    return Expanded(
-      child: Column(children: [
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 12, color: _kTextSec, fontWeight: FontWeight.w500)),
-      ]),
-    );
+  Widget _statCol(String value, String label, Color labelColor) {
+    return Column(children: [
+      Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _kAccent)),
+      const SizedBox(height: 2),
+      Text(label, style: TextStyle(fontSize: 12, color: labelColor, fontWeight: FontWeight.w500)),
+    ]);
   }
 
-  Widget _statDivider() => Container(width: 1, height: 32, color: _kBorder);
-
-  String _emoji(String? c) => (c != null ? const {
-    'italian': '🍝', 'mexican': '🌮', 'japanese': '🍱', 'chinese': '🥡',
-    'indian': '🍛', 'american': '🍔', 'french': '🥐', 'thai': '🍜',
-    'mediterranean': '🫒', 'greek': '🫙',
-  }[c.toLowerCase()] : null) ?? '🍽';
+  Widget _statDivider(Color color) => Container(width: 1, height: 32, color: color);
 }

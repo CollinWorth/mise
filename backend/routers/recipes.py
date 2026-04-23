@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from bson import ObjectId
-from database import mealPlans_collection, recipes_collection, users_collection, follows_collection
+from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection
 from model import Recipe
-from auth import get_current_user_id
+from auth import get_current_user_id, get_optional_user_id
 from pydantic import BaseModel
 import httpx
 import re
@@ -262,6 +262,21 @@ async def _attach_author_names(results: list) -> list:
     return results
 
 
+async def _attach_comment_counts(results: list) -> list:
+    ids = [r["_id"] for r in results if r.get("_id")]
+    if not ids:
+        return results
+    counts_map = {}
+    async for doc in comments_collection.aggregate([
+        {"$match": {"recipe_id": {"$in": ids}}},
+        {"$group": {"_id": "$recipe_id", "count": {"$sum": 1}}},
+    ]):
+        counts_map[doc["_id"]] = doc["count"]
+    for r in results:
+        r["comment_count"] = counts_map.get(r.get("_id", ""), 0)
+    return results
+
+
 @router.get("/feed")
 async def get_feed(current_user_id: str = Depends(get_current_user_id), skip: int = 0, limit: int = 20):
     following = await follows_collection.find({"follower_id": current_user_id}).to_list(1000)
@@ -274,16 +289,21 @@ async def get_feed(current_user_id: str = Depends(get_current_user_id), skip: in
     results = []
     async for r in cursor:
         results.append(recipe_to_json(r))
-    return await _attach_author_names(results)
+    results = await _attach_author_names(results)
+    return await _attach_comment_counts(results)
 
 
 @router.get("/explore")
-async def explore_recipes(skip: int = 0, limit: int = 100):
-    cursor = recipes_collection.find({"is_public": True}).skip(skip).limit(limit)
+async def explore_recipes(skip: int = 0, limit: int = 100, user_id: str | None = Depends(get_optional_user_id)):
+    query: dict = {"is_public": True}
+    if user_id:
+        query["user_id"] = {"$ne": ObjectId(user_id)}
+    cursor = recipes_collection.find(query).skip(skip).limit(limit)
     results = []
     async for r in cursor:
         results.append(recipe_to_json(r))
-    return await _attach_author_names(results)
+    results = await _attach_author_names(results)
+    return await _attach_comment_counts(results)
 
 
 @router.get("/user/{user_id}")
@@ -872,19 +892,7 @@ async def like_recipe(recipe_id: str):
     )
     if not result:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    return {"like_count": result.get("like_count", 0) + 1}
-
-
-@router.post("/{recipe_id}/unlike")
-async def unlike_recipe(recipe_id: str):
-    result = await recipes_collection.find_one_and_update(
-        {"_id": ObjectId(recipe_id)},
-        {"$inc": {"like_count": -1}},
-        return_document=True,
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="Recipe not found")
-    return {"like_count": max(0, result.get("like_count", 1) - 1)}
+    return {"like_count": result.get("like_count", 0)}
 
 
 @router.post("/{recipe_id}/save")
@@ -892,47 +900,108 @@ async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_c
     source = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
     if not source:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    copy = {k: v for k, v in source.items() if k not in ("_id", "user_id", "like_count", "is_public")}
+    # Resolve original author name
+    author_doc = await users_collection.find_one({"_id": source["user_id"]})
+    author_name = author_doc.get("name", "Chef") if author_doc else "Chef"
+    copy = {k: v for k, v in source.items()
+            if k not in ("_id", "user_id", "like_count", "is_public",
+                         "original_recipe_id", "original_author_name", "is_modified")}
     copy["user_id"] = ObjectId(user_id)
     copy["is_public"] = False
     copy["like_count"] = 0
+    copy["original_recipe_id"] = recipe_id
+    copy["original_author_name"] = author_name
+    copy["is_modified"] = False
     result = await recipes_collection.insert_one(copy)
     return {"id": str(result.inserted_id), "message": "Saved to your recipes"}
 
 
+@router.get("/{recipe_id}/versions")
+async def get_recipe_versions(recipe_id: str):
+    cursor = recipes_collection.find({
+        "original_recipe_id": recipe_id,
+        "is_public": True,
+        "is_modified": True,
+    })
+    results = []
+    async for r in cursor:
+        results.append(recipe_to_json(r))
+    return await _attach_author_names(results)
+
+
+async def _maybe_archive_image(url: str | None, request: Request) -> str | None:
+    """Download an external image URL and store it locally; return the local URL."""
+    if not url:
+        return url
+    base_url = str(request.base_url).rstrip("/")
+    # Already a local URL — nothing to do
+    if url.startswith(base_url) or '/uploads/' in url or not url.startswith('http'):
+        return url
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            return url
+        ct = r.headers.get('content-type', '').split(';')[0].strip().lower()
+        ext = {
+            'image/jpeg': '.jpg', 'image/jpg': '.jpg',
+            'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif',
+        }.get(ct, '.jpg')
+        filename = f"{uuid.uuid4().hex}{ext}"
+        os.makedirs("uploads", exist_ok=True)
+        with open(f"uploads/{filename}", "wb") as f:
+            f.write(r.content)
+        return f"{base_url}/uploads/{filename}"
+    except Exception:
+        return url
+
+
 @router.post("/")
-async def create_recipe(recipe: Recipe, _: str = Depends(get_current_user_id)):
+async def create_recipe(request: Request, recipe: Recipe, _: str = Depends(get_current_user_id)):
     recipe_dict = recipe.dict()
     try:
         recipe_dict["user_id"] = ObjectId(recipe_dict["user_id"])
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user_id format")
+    recipe_dict["image_url"] = await _maybe_archive_image(recipe_dict.get("image_url"), request)
     await recipes_collection.insert_one(recipe_dict)
     return {"message": "Recipe created successfully"}
 
 
 @router.put("/{recipe_id}")
-async def update_recipe(recipe_id: str, recipe: Recipe, _: str = Depends(get_current_user_id)):
+async def update_recipe(request: Request, recipe_id: str, recipe: Recipe, user_id: str = Depends(get_current_user_id)):
+    existing = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    if str(existing.get("user_id")) != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     recipe_dict = recipe.dict()
     try:
         recipe_dict["user_id"] = ObjectId(recipe_dict["user_id"])
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user_id format")
+    recipe_dict["image_url"] = await _maybe_archive_image(recipe_dict.get("image_url"), request)
+    # Preserve provenance; mark as modified once edited
+    if existing.get("original_recipe_id"):
+        recipe_dict["original_recipe_id"] = existing["original_recipe_id"]
+        recipe_dict["original_author_name"] = existing.get("original_author_name")
+        recipe_dict["is_modified"] = True
     result = await recipes_collection.find_one_and_replace(
         {"_id": ObjectId(recipe_id)},
         recipe_dict,
         return_document=True,
     )
-    if not result:
-        raise HTTPException(status_code=404, detail="Recipe not found")
     return recipe_to_json(result)
 
 
 @router.delete("/{recipe_id}")
-async def delete_recipe(recipe_id: str, _: str = Depends(get_current_user_id)):
-    result = await recipes_collection.find_one_and_delete({"_id": ObjectId(recipe_id)})
-    if not result:
+async def delete_recipe(recipe_id: str, user_id: str = Depends(get_current_user_id)):
+    existing = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+    if not existing:
         raise HTTPException(status_code=404, detail="Recipe not found")
+    if str(existing.get("user_id")) != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    await recipes_collection.delete_one({"_id": ObjectId(recipe_id)})
     return {"message": "Recipe deleted successfully"}
 
 

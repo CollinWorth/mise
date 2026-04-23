@@ -98,7 +98,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
-  Future<void> _addMeal(Recipe recipe, DateTime date) async {
+  Future<void> _addMeal(Recipe recipe, DateTime date, {int multiplier = 1}) async {
     setState(() => _addingId = recipe.id);
     try {
       final mealData = {
@@ -108,7 +108,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
         'image_url': recipe.imageUrl,
         'cook_time': recipe.cookTime,
       };
-      final result = await Store.i.addMealPlan(_uid, _fmt(date), recipe.id, mealData);
+      final result = await Store.i.addMealPlan(_uid, _fmt(date), recipe.id, mealData, multiplier: multiplier);
       setState(() {
         if (_weekView) {
           _weekMeals[_fmt(date)] ??= [];
@@ -189,7 +189,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: _weekView ? null : FloatingActionButton.extended(
         onPressed: () => _showRecipePicker(_selectedDate),
         backgroundColor: const Color(0xFFE8622A),
         icon: const Icon(Icons.add, color: Colors.white),
@@ -358,23 +358,90 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-      itemCount: 7,
-      itemBuilder: (_, i) {
-        final day = _weekStart.add(Duration(days: i));
-        final isToday = _fmt(day) == _fmt(today);
-        final meals = _weekMeals[_fmt(day)] ?? [];
-        return _WeekDayCard(
-          day: day,
-          isToday: isToday,
-          meals: meals,
-          onAddMeal: () => _showRecipePicker(day),
-          onRemoveMeal: (id) => _removeMeal(id, day),
-          months: _months,
-          days: _days,
-        );
-      },
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            itemCount: 7,
+            itemBuilder: (_, i) {
+              final day = _weekStart.add(Duration(days: i));
+              final isToday = _fmt(day) == _fmt(today);
+              final meals = _weekMeals[_fmt(day)] ?? [];
+              return DragTarget<Recipe>(
+                builder: (ctx, candidateData, _) => _WeekDayCard(
+                  day: day, isToday: isToday, meals: meals,
+                  highlighted: candidateData.isNotEmpty,
+                  onAddMeal: () => _showRecipePicker(day),
+                  onRemoveMeal: (id) => _removeMeal(id, day),
+                  months: _months, days: _days,
+                ),
+                onAcceptWithDetails: (details) => _addMeal(details.data, day),
+              );
+            },
+          ),
+        ),
+        _buildRecipeTray(),
+      ],
+    );
+  }
+
+  Widget _buildRecipeTray() {
+    final ts = Theme.of(context).colorScheme.onSurface.withOpacity(0.4);
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor, width: 1.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Row(children: [
+              Icon(Icons.drag_indicator, size: 13, color: ts),
+              const SizedBox(width: 5),
+              Text('Hold & drag to a day',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ts)),
+            ]),
+          ),
+          SizedBox(
+            height: 96,
+            child: _loadingRecipes
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFE8622A), strokeWidth: 2))
+                : _allRecipes.isEmpty
+                    ? Center(child: Text('Add recipes to your library first',
+                        style: TextStyle(fontSize: 12, color: ts)))
+                    : ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        itemCount: _allRecipes.length,
+                        itemBuilder: (_, i) {
+                          final recipe = _allRecipes[i];
+                          return LongPressDraggable<Recipe>(
+                            data: recipe,
+                            hapticFeedbackOnStart: true,
+                            delay: const Duration(milliseconds: 250),
+                            feedback: Material(
+                              color: Colors.transparent,
+                              child: SizedBox(
+                                width: 72,
+                                child: _RecipeTrayItem(recipe: recipe, isDragging: true),
+                              ),
+                            ),
+                            childWhenDragging: Opacity(
+                              opacity: 0.3,
+                              child: _RecipeTrayItem(recipe: recipe),
+                            ),
+                            child: _RecipeTrayItem(recipe: recipe),
+                          );
+                        },
+                      ),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ],
+      ),
     );
   }
 
@@ -393,11 +460,24 @@ class _PlannerScreenState extends State<PlannerScreen> {
         recipes: _allRecipes,
         addedIds: alreadyAdded,
         addingId: _addingId,
-        onAdd: (recipe) { _addMeal(recipe, date); Navigator.pop(context); },
+        onAdd: (recipe, mult) { _addMeal(recipe, date, multiplier: mult); Navigator.pop(context); },
         loading: _loadingRecipes,
       ),
     );
   }
+}
+
+// ── Pastel helper ────────────────────────────────────────────────────────────
+Color _mealPastel(String? cuisine) {
+  const _p = {
+    'italian': Color(0xFFF5EDE8), 'mexican': Color(0xFFE9F2E9),
+    'japanese': Color(0xFFF2EDF4), 'chinese': Color(0xFFF5EDEC),
+    'indian': Color(0xFFF5F0E8), 'american': Color(0xFFEBF0F5),
+    'french': Color(0xFFEEF0F8), 'thai': Color(0xFFF3F2E7),
+    'mediterranean': Color(0xFFE8F2EF), 'greek': Color(0xFFEDF0F8),
+    'korean': Color(0xFFF4EDF2),
+  };
+  return _p[(cuisine ?? '').toLowerCase()] ?? const Color(0xFFF2F0EB);
 }
 
 // ── Week day card ─────────────────────────────────────────────────────────────
@@ -405,6 +485,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
 class _WeekDayCard extends StatelessWidget {
   final DateTime day;
   final bool isToday;
+  final bool highlighted;
   final List<Map<String, dynamic>> meals;
   final VoidCallback onAddMeal;
   final void Function(String id) onRemoveMeal;
@@ -412,8 +493,8 @@ class _WeekDayCard extends StatelessWidget {
   final List<String> days;
 
   const _WeekDayCard({
-    required this.day, required this.isToday, required this.meals,
-    required this.onAddMeal, required this.onRemoveMeal,
+    required this.day, required this.isToday, this.highlighted = false,
+    required this.meals, required this.onAddMeal, required this.onRemoveMeal,
     required this.months, required this.days,
   });
 
@@ -425,9 +506,12 @@ class _WeekDayCard extends StatelessWidget {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isToday ? const Color(0xFFE8622A) : Theme.of(context).dividerColor,
-          width: isToday ? 2 : 1.5,
+          color: highlighted || isToday ? const Color(0xFFE8622A) : Theme.of(context).dividerColor,
+          width: highlighted || isToday ? 2 : 1.5,
         ),
+        boxShadow: highlighted ? [
+          BoxShadow(color: const Color(0xFFE8622A).withOpacity(0.18), blurRadius: 10, spreadRadius: 1),
+        ] : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,14 +597,33 @@ class _WeekMealRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(meal['recipe_name'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+          if ((meal['multiplier'] as int? ?? 1) > 1)
+            Container(
+              margin: const EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(color: const Color(0xFFE8622A), borderRadius: BorderRadius.circular(99)),
+              child: Text('×${meal['multiplier']}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+            ),
           if ((meal['cook_time'] as int? ?? 0) > 0)
-            Text('${meal['cook_time']}m', style: const TextStyle(fontSize: 11, color: Color(0xFF888480))),
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Text('${meal['cook_time']}m', style: const TextStyle(fontSize: 11, color: Color(0xFF888480))),
+            ),
         ]),
       ),
     );
   }
 
-  Widget _placeholder() => Container(color: const Color(0xFF2C2C2C), child: const Center(child: Text('🍽', style: TextStyle(fontSize: 16))));
+  Widget _placeholder() {
+    final name = meal['recipe_name'] as String? ?? '';
+    return Container(
+      color: _mealPastel(meal['cuisine'] as String?),
+      child: Center(child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0x881A1918)),
+      )),
+    );
+  }
 }
 
 // ── Meal card (day view) ──────────────────────────────────────────────────────
@@ -557,7 +660,13 @@ class _MealCard extends StatelessWidget {
               width: 60, height: 60,
               child: imageUrl != null && imageUrl.isNotEmpty
                   ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover)
-                  : Container(color: const Color(0xFF2C2C2C), child: const Center(child: Text('🍽', style: TextStyle(fontSize: 24)))),
+                  : Container(
+                      color: _mealPastel(meal['cuisine'] as String?),
+                      child: Center(child: Text(
+                        (meal['recipe_name'] as String? ?? '').isNotEmpty ? (meal['recipe_name'] as String)[0].toUpperCase() : '?',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0x881A1918)),
+                      )),
+                    ),
             ),
           ),
           const SizedBox(width: 14),
@@ -567,6 +676,7 @@ class _MealCard extends StatelessWidget {
             Row(children: [
               if ((meal['cuisine'] as String? ?? '').isNotEmpty) _chip(meal['cuisine'], context),
               if (cookTime != null && cookTime > 0) _chip('${cookTime}m cook', context),
+              if ((meal['multiplier'] as int? ?? 1) > 1) _multChip('×${meal['multiplier']}'),
             ]),
           ])),
           IconButton(
@@ -585,6 +695,13 @@ class _MealCard extends StatelessWidget {
     decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: BorderRadius.circular(99), border: Border.all(color: Theme.of(context).dividerColor)),
     child: Text(text, style: const TextStyle(fontSize: 11, color: Color(0xFF888480), fontWeight: FontWeight.w500)),
   );
+
+  Widget _multChip(String text) => Container(
+    margin: const EdgeInsets.only(right: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(color: const Color(0xFFE8622A), borderRadius: BorderRadius.circular(99)),
+    child: Text(text, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w800)),
+  );
 }
 
 // ── Recipe picker ─────────────────────────────────────────────────────────────
@@ -593,7 +710,7 @@ class _RecipePicker extends StatefulWidget {
   final List<Recipe> recipes;
   final Set<String> addedIds;
   final String? addingId;
-  final Function(Recipe) onAdd;
+  final Function(Recipe, int) onAdd;
   final bool loading;
   const _RecipePicker({required this.recipes, required this.addedIds, required this.addingId, required this.onAdd, required this.loading});
 
@@ -603,6 +720,7 @@ class _RecipePicker extends StatefulWidget {
 
 class _RecipePickerState extends State<_RecipePicker> {
   String _search = '';
+  int _multiplier = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -617,6 +735,9 @@ class _RecipePickerState extends State<_RecipePicker> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Row(children: [
             const Expanded(child: Text('Add to plan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            // Multiplier stepper
+            _MultStepper(value: _multiplier, onChanged: (v) => setState(() => _multiplier = v)),
+            const SizedBox(width: 8),
             IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Color(0xFF888480)), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           ]),
         ),
@@ -648,7 +769,7 @@ class _RecipePickerState extends State<_RecipePicker> {
                     final added = widget.addedIds.contains(recipe.id);
                     final adding = widget.addingId == recipe.id;
                     return GestureDetector(
-                      onTap: added ? null : () => widget.onAdd(recipe),
+                      onTap: added ? null : () => widget.onAdd(recipe, _multiplier),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.all(12),
@@ -664,7 +785,13 @@ class _RecipePickerState extends State<_RecipePicker> {
                               width: 50, height: 50,
                               child: recipe.imageUrl != null
                                   ? CachedNetworkImage(imageUrl: recipe.imageUrl!, fit: BoxFit.cover)
-                                  : Container(color: const Color(0xFF2C2C2C), child: const Center(child: Text('🍽'))),
+                                  : Container(
+                                  color: _mealPastel(recipe.cuisine.isNotEmpty ? recipe.cuisine : null),
+                                  child: Center(child: Text(
+                                    recipe.name.isNotEmpty ? recipe.name[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0x881A1918)),
+                                  )),
+                                ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -683,6 +810,103 @@ class _RecipePickerState extends State<_RecipePicker> {
                 ),
         ),
       ]),
+    );
+  }
+}
+
+// ── Multiplier stepper ────────────────────────────────────────────────────────
+
+class _MultStepper extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+  const _MultStepper({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final border = Theme.of(context).dividerColor;
+    final card = Theme.of(context).cardColor;
+    btn(IconData icon, bool enabled, VoidCallback onTap) => GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 26, height: 26,
+        decoration: BoxDecoration(color: card, border: Border.all(color: border), borderRadius: BorderRadius.circular(6)),
+        child: Icon(icon, size: 13, color: enabled ? const Color(0xFF444140) : const Color(0xFFCCCAC5)),
+      ),
+    );
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      btn(Icons.remove, value > 1, () => onChanged(value - 1)),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text('×$value', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF1A1918))),
+      ),
+      btn(Icons.add, value < 8, () => onChanged(value + 1)),
+    ]);
+  }
+}
+
+// ── Recipe tray item ──────────────────────────────────────────────────────────
+
+class _RecipeTrayItem extends StatelessWidget {
+  final Recipe recipe;
+  final bool isDragging;
+  const _RecipeTrayItem({required this.recipe, this.isDragging = false});
+
+  static const _pastels = {
+    'italian': Color(0xFFF5EDE8), 'mexican': Color(0xFFE9F2E9),
+    'japanese': Color(0xFFF2EDF4), 'chinese': Color(0xFFF5EDEC),
+    'indian': Color(0xFFF5F0E8), 'american': Color(0xFFEBF0F5),
+    'french': Color(0xFFEEF0F8), 'thai': Color(0xFFF3F2E7),
+    'mediterranean': Color(0xFFE8F2EF), 'greek': Color(0xFFEDF0F8),
+    'korean': Color(0xFFF4EDF2),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final pastel = _pastels[recipe.cuisine.toLowerCase()] ?? const Color(0xFFF2F0EB);
+    final surface = Theme.of(context).colorScheme.surface;
+    final border = Theme.of(context).dividerColor;
+
+    return Container(
+      width: 72,
+      margin: const EdgeInsets.only(right: 8, top: 2),
+      decoration: BoxDecoration(
+        color: isDragging ? pastel : surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDragging ? const Color(0xFFE8622A) : border,
+          width: isDragging ? 2 : 1.5,
+        ),
+        boxShadow: isDragging ? [
+          BoxShadow(color: const Color(0xFFE8622A).withOpacity(0.25),
+            blurRadius: 14, offset: const Offset(0, 5)),
+        ] : null,
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 46, width: double.infinity,
+            child: recipe.imageUrl != null && recipe.imageUrl!.isNotEmpty
+                ? CachedNetworkImage(imageUrl: recipe.imageUrl!, fit: BoxFit.cover)
+                : Container(
+                    color: pastel,
+                    child: Center(child: Text(
+                      recipe.name.isNotEmpty ? recipe.name[0].toUpperCase() : '?',
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1918)),
+                    )),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(5, 3, 5, 3),
+            child: Text(recipe.name,
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, height: 1.3,
+                color: Theme.of(context).colorScheme.onSurface),
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -90,6 +90,12 @@ class ServerStorageImpl extends AppStorage {
   }
 
   @override
+  Future<void> clearGroceryItems(String listId, {bool checkedOnly = false}) async {
+    final query = checkedOnly ? '?checked_only=true' : '';
+    await Api.delete('/groceryList/$listId$query');
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getDayMeals(String userId, String date) async {
     try {
       final r = await Api.get('/mealPlans/$date/$userId');
@@ -101,7 +107,7 @@ class ServerStorageImpl extends AppStorage {
             final rr = await Api.get('/recipes/${p['recipe_id']}');
             if (rr.statusCode == 200) {
               final recipe = jsonDecode(rr.body) as Map<String, dynamic>;
-              return {...recipe, 'mealPlanId': p['_id']};
+              return {...recipe, 'mealPlanId': p['_id'], 'multiplier': p['multiplier'] ?? 1};
             }
           } catch (_) {}
           return null;
@@ -113,11 +119,12 @@ class ServerStorageImpl extends AppStorage {
   }
 
   @override
-  Future<Map<String, dynamic>> addMealPlan(String userId, String date, String recipeId, Map<String, dynamic> recipeData) async {
-    final r = await Api.post('/mealPlans/Create/$date/$userId/$recipeId', {});
+  @override
+  Future<Map<String, dynamic>> addMealPlan(String userId, String date, String recipeId, Map<String, dynamic> recipeData, {int multiplier = 1}) async {
+    final r = await Api.post('/mealPlans/Create/$date/$userId/$recipeId', {'multiplier': multiplier});
     if (r.statusCode == 200) {
       final plan = jsonDecode(r.body) as Map<String, dynamic>;
-      return {...recipeData, 'mealPlanId': plan['_id']};
+      return {...recipeData, 'mealPlanId': plan['_id'], 'multiplier': multiplier};
     }
     throw Exception('Failed to add meal plan');
   }

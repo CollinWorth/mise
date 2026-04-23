@@ -15,6 +15,17 @@ class UserIn(BaseModel):
     email: EmailStr
     password: str
 
+class ProfileUpdate(BaseModel):
+    name: str
+    email: EmailStr
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+class AccountDelete(BaseModel):
+    password: str
+
 
 @router.post("/")
 async def create_user(user: UserIn):
@@ -51,6 +62,41 @@ async def get_me(user_id: str = Depends(get_current_user_id)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {"id": str(user["_id"]), "name": user.get("name"), "email": user.get("email")}
+
+
+@router.put("/me")
+async def update_profile(data: ProfileUpdate, user_id: str = Depends(get_current_user_id)):
+    existing = await db.find_one({"email": data.email, "_id": {"$ne": ObjectId(user_id)}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already in use")
+    await db.update_one({"_id": ObjectId(user_id)}, {"$set": {"name": data.name, "email": data.email}})
+    return {"id": user_id, "name": data.name, "email": data.email}
+
+
+@router.put("/me/password")
+async def change_password(data: PasswordChange, user_id: str = Depends(get_current_user_id)):
+    user = await db.find_one({"_id": ObjectId(user_id)})
+    if not user or not pwd_context.verify(data.current_password, user["password"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    hashed = pwd_context.hash(data.new_password)
+    await db.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": hashed}})
+    return {"message": "Password updated"}
+
+
+@router.delete("/me")
+async def delete_account(data: AccountDelete, user_id: str = Depends(get_current_user_id)):
+    user = await db.find_one({"_id": ObjectId(user_id)})
+    if not user or not pwd_context.verify(data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    oid = ObjectId(user_id)
+    await asyncio.gather(
+        db.delete_one({"_id": oid}),
+        recipes_collection.delete_many({"user_id": oid}),
+        follows_collection.delete_many({"$or": [{"follower_id": user_id}, {"following_id": user_id}]}),
+    )
+    return {"message": "Account deleted"}
 
 
 @router.get("/search")

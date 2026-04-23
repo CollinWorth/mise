@@ -94,3 +94,19 @@
 .nav-dropdown-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
 .nav-dropdown-signout { color: rgba(232,98,42,0.85); }
 .nav-dropdown-signout:hover { color: var(--accent); }
+
+.nav-theme-toggle {
+  background: transparent;
+  border: none;
+  color: var(--nav-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-theme-toggle:hover { color: var(--nav-text); background: rgba(255,255,255,0.07); }

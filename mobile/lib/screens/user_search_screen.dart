@@ -10,8 +10,9 @@ const _kTextSec = Color(0xFF888480);
 
 class UserSearchScreen extends StatefulWidget {
   final Map<String, dynamic> currentUser;
+  final VoidCallback? onFollowChanged;
 
-  const UserSearchScreen({super.key, required this.currentUser});
+  const UserSearchScreen({super.key, required this.currentUser, this.onFollowChanged});
 
   @override
   State<UserSearchScreen> createState() => _UserSearchScreenState();
@@ -106,6 +107,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
       } else {
         await Api.post('/follows/$uid', {});
       }
+      widget.onFollowChanged?.call();
     } catch (_) {
       if (mounted) setState(() => _following[uid] = wasFollowing);
     }

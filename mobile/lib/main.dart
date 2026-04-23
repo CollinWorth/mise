@@ -169,7 +169,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      SocialScreen(user: widget.user),
+      SocialScreen(user: widget.user, onRecipeSaved: () => _recipesKey.currentState?.reload()),
       RecipesScreen(key: _recipesKey, user: widget.user),
       PlannerScreen(user: widget.user),
       GroceryScreen(user: widget.user),

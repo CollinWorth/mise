@@ -19,10 +19,11 @@ class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key, required this.user, this.embedded = false});
 
   @override
-  State<FeedScreen> createState() => _FeedScreenState();
+  State<FeedScreen> createState() => FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class FeedScreenState extends State<FeedScreen> {
+  void reload() => _load();
   List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
   Set<String> _likedIds = {};
@@ -66,19 +67,18 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _toggleLike(String id) async {
-    final wasLiked = _likedIds.contains(id);
-    final delta = wasLiked ? -1 : 1;
+    if (_likedIds.contains(id)) return;
     setState(() {
-      wasLiked ? _likedIds.remove(id) : _likedIds.add(id);
-      _likeCounts[id] = ((_likeCounts[id] ?? 0) + delta).clamp(0, 999999);
+      _likedIds.add(id);
+      _likeCounts[id] = ((_likeCounts[id] ?? 0) + 1).clamp(0, 999999);
     });
     await _persistLiked();
     try {
-      await Api.post('/recipes/$id/${wasLiked ? 'unlike' : 'like'}', {});
+      await Api.post('/recipes/$id/like', {});
     } catch (_) {
       if (mounted) setState(() {
-        wasLiked ? _likedIds.add(id) : _likedIds.remove(id);
-        _likeCounts[id] = ((_likeCounts[id] ?? 0) - delta).clamp(0, 999999);
+        _likedIds.remove(id);
+        _likeCounts[id] = ((_likeCounts[id] ?? 1) - 1).clamp(0, 999999);
       });
     }
   }
@@ -187,7 +187,8 @@ class _FeedScreenState extends State<FeedScreen> {
               final authorId = post['user_id'] as String?;
               if (authorId != null) {
                 Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => UserProfileScreen(userId: authorId, currentUser: widget.user)));
+                  builder: (_) => UserProfileScreen(userId: authorId, currentUser: widget.user),
+                )).then((_) => _load());
               }
             },
             onTap: () async {
@@ -207,6 +208,20 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 }
 
+const _cuisineBg = {
+  'italian':       Color(0xFFF5EDE8),
+  'mexican':       Color(0xFFE9F2E9),
+  'japanese':      Color(0xFFF2EDF4),
+  'chinese':       Color(0xFFF5EDEC),
+  'indian':        Color(0xFFF5F0E8),
+  'american':      Color(0xFFEBF0F5),
+  'french':        Color(0xFFEEF0F8),
+  'thai':          Color(0xFFF3F2E7),
+  'mediterranean': Color(0xFFE8F2EF),
+  'greek':         Color(0xFFEDF0F8),
+  'korean':        Color(0xFFF4EDF2),
+};
+
 class _FeedCard extends StatelessWidget {
   final Map<String, dynamic> post;
   final bool liked;
@@ -223,10 +238,16 @@ class _FeedCard extends StatelessWidget {
     required this.onTapAuthor, required this.onTap,
   });
 
+  Color _cardBg(String cuisine, bool dark) {
+    final base = _cuisineBg[cuisine.toLowerCase()] ?? const Color(0xFFF2F0EB);
+    return dark ? Color.lerp(base, const Color(0xFF1A1918), 0.72)! : base;
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = post['recipe_name'] as String? ?? '';
     final imageUrl = post['image_url'] as String?;
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
     final authorName = post['author_name'] as String?;
     final cuisine = post['cuisine'] as String? ?? '';
     final category = post['category'] as String? ?? '';
@@ -234,7 +255,113 @@ class _FeedCard extends StatelessWidget {
     final cook = (post['cook_time'] as num?)?.toInt() ?? 0;
     final total = prep + cook;
     final tags = (post['tags'] as String? ?? '').split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).take(3).toList();
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final noImgBg = _cardBg(cuisine, dark);
+    final textOnBg = dark ? Colors.white.withOpacity(0.85) : const Color(0xFF1A1918);
+    final commentCount = (post['comment_count'] as num?)?.toInt() ?? 0;
 
+    // ── No-image card ──────────────────────────────────────────────────────────
+    if (!hasImage) {
+      return Container(
+        decoration: BoxDecoration(
+          color: noImgBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: textOnBg.withOpacity(0.08), width: 1.5),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Author row
+            if (authorName != null)
+              GestureDetector(
+                onTap: onTapAuthor,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                  child: Row(children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(color: textOnBg.withOpacity(0.15), shape: BoxShape.circle),
+                      child: Center(child: Text(authorName[0].toUpperCase(),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textOnBg))),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(authorName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textOnBg)),
+                    const Spacer(),
+                    if (cuisine.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: textOnBg.withOpacity(0.1), borderRadius: BorderRadius.circular(99)),
+                        child: Text(cuisine, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textOnBg.withOpacity(0.7))),
+                      ),
+                  ]),
+                ),
+              ),
+            // Recipe info
+            GestureDetector(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (category.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: textOnBg.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Text(category, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textOnBg.withOpacity(0.65))),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    Text(name,
+                      maxLines: 3, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
+                        color: textOnBg, letterSpacing: -0.4, height: 1.2)),
+                    if (total > 0 || tags.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                        if (total > 0)
+                          Text('$total min', style: TextStyle(fontSize: 13, color: textOnBg.withOpacity(0.5))),
+                        ...tags.map((t) => Text('#$t',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textOnBg.withOpacity(0.45)))),
+                      ]),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Action row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(children: [
+                _actionBtn(icon: liked ? Icons.favorite : Icons.favorite_border, color: liked ? _kAccent : textOnBg, onTap: onLike),
+                const SizedBox(width: 4),
+                if (likeCount > 0)
+                  Text('$likeCount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textOnBg)),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: onTap,
+                  child: Row(children: [
+                    Icon(Icons.chat_bubble_outline, size: 20, color: textOnBg),
+                    if (commentCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Text('$commentCount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textOnBg)),
+                    ],
+                  ]),
+                ),
+                const Spacer(),
+                _actionBtn(icon: saved ? Icons.bookmark : Icons.bookmark_border_outlined, color: textOnBg, onTap: onSave),
+              ]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Image card ──────────────────────────────────────────────────────────────
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -260,7 +387,8 @@ class _FeedCard extends StatelessWidget {
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
                     ),
                     const SizedBox(width: 10),
-                    Text(authorName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(authorName,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _kDark)),
                     const Spacer(),
                     if (cuisine.isNotEmpty)
                       Text(cuisine, style: const TextStyle(fontSize: 12, color: _kTextSec)),
@@ -274,12 +402,14 @@ class _FeedCard extends StatelessWidget {
             onTap: onTap,
             child: AspectRatio(
               aspectRatio: 4 / 3,
-              child: imageUrl != null && imageUrl.isNotEmpty
-                  ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover)
-                  : Container(
-                      color: const Color(0xFFF0EEE9),
-                      child: Center(child: Text(_emoji(cuisine), style: const TextStyle(fontSize: 64))),
-                    ),
+              child: CachedNetworkImage(
+                imageUrl: imageUrl!,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => _noImageHero(
+                  name: name, category: category, cuisine: cuisine,
+                  total: total, tags: tags, dark: dark,
+                ),
+              ),
             ),
           ),
 
@@ -288,25 +418,23 @@ class _FeedCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
             child: Row(
               children: [
-                _actionBtn(
-                  icon: liked ? Icons.favorite : Icons.favorite_border,
-                  color: liked ? _kAccent : _kDark,
-                  onTap: onLike,
-                ),
+                _actionBtn(icon: liked ? Icons.favorite : Icons.favorite_border, color: liked ? _kAccent : _kDark, onTap: onLike),
                 const SizedBox(width: 4),
                 if (likeCount > 0)
-                  Text('$likeCount', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('$likeCount', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kDark)),
                 const SizedBox(width: 12),
                 GestureDetector(
                   onTap: onTap,
-                  child: const Icon(Icons.chat_bubble_outline, size: 22, color: _kDark),
+                  child: Row(children: [
+                    const Icon(Icons.chat_bubble_outline, size: 22, color: _kDark),
+                    if (commentCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Text('$commentCount', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kDark)),
+                    ],
+                  ]),
                 ),
                 const Spacer(),
-                _actionBtn(
-                  icon: saved ? Icons.bookmark : Icons.bookmark_border_outlined,
-                  color: saved ? _kDark : _kDark,
-                  onTap: onSave,
-                ),
+                _actionBtn(icon: saved ? Icons.bookmark : Icons.bookmark_border_outlined, color: _kDark, onTap: onSave),
               ],
             ),
           ),
@@ -325,10 +453,7 @@ class _FeedCard extends StatelessWidget {
                     if (category.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _kAccent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
+                        decoration: BoxDecoration(color: _kAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(99)),
                         child: Text(category, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kAccent)),
                       ),
                       const SizedBox(width: 6),
@@ -338,17 +463,50 @@ class _FeedCard extends StatelessWidget {
                   ]),
                   if (tags.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 4, runSpacing: 4,
+                    Wrap(spacing: 4, runSpacing: 4,
                       children: tags.map((t) => Text('#$t',
-                        style: const TextStyle(fontSize: 12, color: _kTextSec, fontWeight: FontWeight.w500))).toList(),
-                    ),
+                        style: const TextStyle(fontSize: 12, color: _kTextSec, fontWeight: FontWeight.w500))).toList()),
                   ],
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _noImageHero({
+    required String name, required String category, required String cuisine,
+    required int total, required List<String> tags, required bool dark,
+  }) {
+    final bg = _cardBg(cuisine, dark);
+    final text = dark ? Colors.white.withOpacity(0.85) : const Color(0xFF1A1918);
+    return SizedBox(
+      height: 220,
+      child: Container(
+        color: bg,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (category.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(color: text.withOpacity(0.1), borderRadius: BorderRadius.circular(99)),
+                child: Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: text.withOpacity(0.7))),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: text, letterSpacing: -0.5, height: 1.15)),
+            if (total > 0) ...[
+              const SizedBox(height: 5),
+              Text('$total min', style: TextStyle(fontSize: 13, color: text.withOpacity(0.45))),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -364,9 +522,4 @@ class _FeedCard extends StatelessWidget {
     );
   }
 
-  String _emoji(String? c) => (c != null ? const {
-    'italian': '🍝', 'mexican': '🌮', 'japanese': '🍱', 'chinese': '🥡',
-    'indian': '🍛', 'american': '🍔', 'french': '🥐', 'thai': '🍜',
-    'mediterranean': '🫒', 'greek': '🫙',
-  }[c.toLowerCase()] : null) ?? '🍽';
 }

@@ -73,6 +73,14 @@ class Api {
     return http.delete(Uri.parse('$kBaseUrl$path'), headers: await _headers()).timeout(_timeout);
   }
 
+  static Future<http.Response> deleteWithBody(String path, Map body) async {
+    final request = http.Request('DELETE', Uri.parse('$kBaseUrl$path'));
+    request.headers.addAll(await _headers());
+    request.body = jsonEncode(body);
+    final streamed = await request.send().timeout(_timeout);
+    return http.Response.fromStream(streamed);
+  }
+
   static Future<http.Response> uploadImage(String path, File file) async {
     final token = await getToken();
     final request = http.MultipartRequest('POST', Uri.parse('$kBaseUrl$path'));

@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
+import '../models/recipe.dart';
+import 'add_recipe_screen.dart';
 import 'comments_widget.dart';
 import 'user_profile_screen.dart';
 
@@ -11,6 +14,14 @@ const _kBg = Color(0xFFF7F6F3);
 const _kDark = Color(0xFF1A1918);
 const _kBorder = Color(0xFFE5E2DC);
 const _kTextSec = Color(0xFF888480);
+const _kPastels = {
+  'italian': Color(0xFFF5EDE8), 'mexican': Color(0xFFE9F2E9),
+  'japanese': Color(0xFFF2EDF4), 'chinese': Color(0xFFF5EDEC),
+  'indian': Color(0xFFF5F0E8), 'american': Color(0xFFEBF0F5),
+  'french': Color(0xFFEEF0F8), 'thai': Color(0xFFF3F2E7),
+  'mediterranean': Color(0xFFE8F2EF), 'greek': Color(0xFFEDF0F8),
+  'korean': Color(0xFFF4EDF2),
+};
 
 class PublicRecipeDetailScreen extends StatefulWidget {
   final Map<String, dynamic> recipe;
@@ -27,12 +38,29 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
   late int _likeCount;
   bool _saved = false;
   bool _saving = false;
+  List<Map<String, dynamic>> _versions = [];
+  bool _showVersions = false;
+  int _servings = 4;
+  int _baseServings = 0;
 
   @override
   void initState() {
     super.initState();
     _likeCount = (widget.recipe['like_count'] as num?)?.toInt() ?? 0;
+    _baseServings = (widget.recipe['servings'] as num?)?.toInt() ?? 0;
+    _servings = _baseServings > 0 ? _baseServings : 4;
     _loadLiked();
+    _loadVersions();
+  }
+
+  Future<void> _loadVersions() async {
+    try {
+      final r = await Api.get('/recipes/$_id/versions');
+      if (r.statusCode == 200 && mounted) {
+        final data = (jsonDecode(r.body) as List).cast<Map<String, dynamic>>();
+        setState(() => _versions = data);
+      }
+    } catch (_) {}
   }
 
   String get _id => widget.recipe['_id'] as String;
@@ -53,20 +81,17 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
   }
 
   Future<void> _toggleLike() async {
-    final wasLiked = _liked;
-    setState(() {
-      _liked = !_liked;
-      _likeCount = (_likeCount + (_liked ? 1 : -1)).clamp(0, 999999);
-    });
+    if (_liked) return;
+    setState(() { _liked = true; _likeCount = _likeCount + 1; });
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('mise_liked');
     final list = raw != null ? (jsonDecode(raw) as List).cast<String>() : <String>[];
-    _liked ? (list.contains(_id) ? null : list.add(_id)) : list.remove(_id);
+    if (!list.contains(_id)) list.add(_id);
     await prefs.setString('mise_liked', jsonEncode(list));
     try {
-      await Api.post('/recipes/$_id/${wasLiked ? 'unlike' : 'like'}', {});
+      await Api.post('/recipes/$_id/like', {});
     } catch (_) {
-      if (mounted) setState(() { _liked = wasLiked; _likeCount = (_likeCount + (wasLiked ? 1 : -1)).clamp(0, 999999); });
+      if (mounted) setState(() { _liked = false; _likeCount = (_likeCount - 1).clamp(0, 999999); });
     }
   }
 
@@ -79,6 +104,56 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
     } catch (_) {}
     if (mounted) setState(() => _saving = false);
   }
+
+  double get _scaleFactor => _baseServings > 0 ? _servings / _baseServings : 1.0;
+
+  String _scaleQty(String qty) {
+    if (qty.isEmpty) return qty;
+    final s = qty.trim();
+    final mixed = RegExp(r'^(\d+)\s+(\d+)\s*/\s*(\d+)$').firstMatch(s);
+    if (mixed != null) {
+      final v = (double.parse(mixed.group(1)!) + double.parse(mixed.group(2)!) / double.parse(mixed.group(3)!)) * _scaleFactor;
+      return _fmtNum(v);
+    }
+    final frac = RegExp(r'^(\d+)\s*/\s*(\d+)$').firstMatch(s);
+    if (frac != null) {
+      return _fmtNum(double.parse(frac.group(1)!) / double.parse(frac.group(2)!) * _scaleFactor);
+    }
+    final n = double.tryParse(s);
+    if (n != null) return _fmtNum(n * _scaleFactor);
+    return qty;
+  }
+
+  String _fmtNum(double n) {
+    final r = (n * 4).round() / 4;
+    if (r == r.truncateToDouble()) return '${r.truncate()}';
+    final whole = r.truncate();
+    final frac = r - whole;
+    final fracStr = (frac - 0.25).abs() < 0.01 ? '¼' : (frac - 0.5).abs() < 0.01 ? '½' : '¾';
+    return whole > 0 ? '$whole$fracStr' : fracStr;
+  }
+
+  void _share() {
+    final webBase = kBaseUrl.contains(':8000') ? kBaseUrl.replaceFirst(':8000', ':3000') : kBaseUrl;
+    final url = '$webBase/recipe/$_id';
+    Clipboard.setData(ClipboardData(text: url));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Link copied to clipboard'), behavior: SnackBarBehavior.floating));
+  }
+
+  Widget _scalerBtn(IconData icon, VoidCallback? onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 28, height: 28,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0EEE9),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Icon(icon, size: 14,
+        color: onTap != null ? _kDark : const Color(0xFFCCCCC0)),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -106,8 +181,18 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Colors.white),
                   tooltip: 'Edit recipe',
-                  onPressed: () {/* navigate to edit */},
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => AddRecipeScreen(
+                      user: widget.user,
+                      existingRecipe: Recipe.fromJson(widget.recipe),
+                    ),
+                  )),
                 ),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white),
+                tooltip: 'Share',
+                onPressed: _share,
+              ),
               // Like button in app bar
               GestureDetector(
                 onTap: _toggleLike,
@@ -133,13 +218,16 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
                 children: [
                   _imageUrl != null && _imageUrl!.isNotEmpty
                       ? CachedNetworkImage(imageUrl: _imageUrl!, fit: BoxFit.cover)
-                      : Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(colors: [Color(0xFF2C2C2C), Color(0xFF4A4A4A)],
-                              begin: Alignment.topLeft, end: Alignment.bottomRight),
-                          ),
-                          child: Center(child: Text(_emoji(_cuisine), style: const TextStyle(fontSize: 64))),
-                        ),
+                      : Container(color: _kPastels[_cuisine.toLowerCase()] ?? const Color(0xFFF2F0EB)),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                        colors: [Color(0x661A1918), Colors.transparent],
+                        stops: [0.0, 0.38],
+                      ),
+                    ),
+                  ),
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -197,6 +285,68 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
                         ],
                       ),
                     ),
+
+                  // Provenance row
+                  if ((widget.recipe['is_modified'] as bool? ?? false) &&
+                      widget.recipe['original_author_name'] != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.subdirectory_arrow_right_rounded, size: 14, color: _kTextSec),
+                        const SizedBox(width: 4),
+                        Text('modified from ', style: const TextStyle(fontSize: 12, color: _kTextSec, fontStyle: FontStyle.italic)),
+                        Text(widget.recipe['original_author_name'] as String,
+                          style: const TextStyle(fontSize: 12, color: _kTextSec, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic)),
+                      ],
+                    ),
+                  ],
+
+                  // Versions / remixes
+                  if (_versions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _showVersions = !_showVersions),
+                      child: Row(
+                        children: [
+                          Icon(_showVersions ? Icons.expand_less : Icons.expand_more, size: 16, color: _kAccent),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_versions.length} remix${_versions.length != 1 ? 'es' : ''} of this recipe',
+                            style: const TextStyle(fontSize: 12, color: _kAccent, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_showVersions) ...[
+                      const SizedBox(height: 8),
+                      ...(_versions.map((v) => GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => PublicRecipeDetailScreen(recipe: v, user: widget.user))),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _kBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(v['recipe_name'] as String? ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  if (v['author_name'] != null)
+                                    Text('by ${v['author_name']}', style: const TextStyle(fontSize: 11, color: _kTextSec)),
+                                ],
+                              )),
+                              const Icon(Icons.chevron_right, size: 16, color: _kTextSec),
+                            ],
+                          ),
+                        ),
+                      ))),
+                    ],
+                  ],
                   const SizedBox(height: 16),
 
                   // Tags
@@ -247,7 +397,19 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
 
                   // Ingredients
                   if (ingredients.isNotEmpty) ...[
-                    const Text('Ingredients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Row(
+                      children: [
+                        const Expanded(child: Text('Ingredients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+                        if (_baseServings > 0) ...[
+                          _scalerBtn(Icons.remove, _servings > 1 ? () => setState(() => _servings--) : null),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('$_servings', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          ),
+                          _scalerBtn(Icons.add, () => setState(() => _servings++)),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     ...ingredients.map((ing) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -258,7 +420,7 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
                           Expanded(child: Text(ing['name'] ?? '', style: const TextStyle(fontSize: 14))),
                           if ((ing['quantity'] ?? '').toString().isNotEmpty || (ing['unit'] ?? '').toString().isNotEmpty)
                             Text(
-                              [ing['quantity'], ing['unit']].where((s) => s != null && s.toString().isNotEmpty).join(' '),
+                              [_scaleQty((ing['quantity'] ?? '').toString()), (ing['unit'] ?? '').toString()].where((s) => s.isNotEmpty).join(' '),
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kTextSec),
                             ),
                         ],
@@ -330,9 +492,4 @@ class _PublicRecipeDetailScreenState extends State<PublicRecipeDetailScreen> {
     );
   }
 
-  String _emoji(String? c) => (c != null ? const {
-    'italian': '🍝', 'mexican': '🌮', 'japanese': '🍱', 'chinese': '🥡',
-    'indian': '🍛', 'american': '🍔', 'french': '🥐', 'thai': '🍜',
-    'mediterranean': '🫒', 'greek': '🫙',
-  }[c.toLowerCase()] : null) ?? '🍽';
 }

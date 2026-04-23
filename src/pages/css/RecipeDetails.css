@@ -59,26 +59,32 @@
 .rd-meta-total     { background: rgba(255,255,255,0.35); }
 .rd-meta-category  { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); font-style: italic; }
 
+/* ── No-image hero variant ── */
+.rd-hero--noimage .rd-back {
+  background: rgba(0,0,0,0.07);
+  border-color: rgba(0,0,0,0.12);
+  color: var(--text-primary);
+}
+.rd-hero--noimage .rd-back:hover { background: rgba(0,0,0,0.12); }
+.rd-hero--noimage .rd-title {
+  color: var(--text-primary);
+  text-shadow: none;
+}
+.rd-hero--noimage .rd-meta-pill {
+  background: rgba(0,0,0,0.07);
+  border-color: rgba(0,0,0,0.12);
+  color: var(--text-secondary);
+  backdrop-filter: none;
+}
+.rd-hero--noimage .rd-meta-accent { background: var(--accent); border-color: transparent; color: #fff; }
+.rd-hero--noimage .rd-meta-total  { background: rgba(0,0,0,0.1); }
+.rd-hero--noimage .rd-meta-category { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); }
+
 /* ── Body ── */
 .rd-body { padding-top: var(--space-6); padding-bottom: var(--space-16); }
 
 .rd-tags { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-5); }
 
-/* ── Cook mode button ── */
-.rd-cook-btn {
-  display: flex; align-items: center; gap: var(--space-3);
-  width: 100%; background: var(--accent); color: #fff;
-  border: none; border-radius: var(--radius-lg);
-  padding: var(--space-4) var(--space-6); font-size: var(--text-base);
-  font-weight: 700; cursor: pointer; margin-bottom: var(--space-6);
-  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
-  justify-content: center;
-}
-.rd-cook-btn span { font-size: 1.25rem; }
-.rd-cook-btn:hover {
-  background: var(--accent-hover); transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(232,98,42,0.35);
-}
 
 /* ── Two-column layout ── */
 .rd-content {
@@ -90,11 +96,44 @@
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius-lg); padding: var(--space-5);
 }
+.rd-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
 .rd-panel-title {
   font-size: var(--text-sm); font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--text-secondary); margin-bottom: var(--space-4);
-  padding-bottom: var(--space-3); border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  margin-bottom: 0; padding-bottom: 0; border-bottom: none;
+}
+.rd-servings {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.rd-servings-btn {
+  width: 28px; height: 28px;
+  padding: 0;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.rd-servings-btn:hover { border-color: var(--accent); color: var(--accent); }
+.rd-servings-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 72px;
+  text-align: center;
 }
 
 /* ── Ingredients ── */
@@ -128,9 +167,20 @@
 
 /* ── Actions ── */
 .rd-actions {
-  display: flex; gap: var(--space-3); margin-top: var(--space-8);
+  display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-8);
   padding-top: var(--space-6); border-top: 1px solid var(--border);
 }
+.rd-like-btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600;
+  padding: 0.55rem var(--space-4); border-radius: 99px; cursor: pointer;
+  transition: all var(--transition);
+}
+.rd-like-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.rd-like-btn--liked { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+.rd-like-btn svg { flex-shrink: 0; transition: transform 0.12s; }
+.rd-like-btn:active svg { transform: scale(1.3); }
 
 /* ── Comments ── */
 .rd-comments {
@@ -202,6 +252,38 @@
 }
 .rd-comment:hover .rd-comment-delete { opacity: 1; }
 .rd-comment-delete:hover { color: var(--error); background: #FFF5F5; }
+
+/* ── Provenance ── */
+.rd-provenance {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--text-sm); color: var(--text-tertiary);
+  margin: var(--space-3) 0;
+}
+.rd-provenance-icon { font-size: 14px; color: var(--accent); }
+.rd-provenance strong { color: var(--text-secondary); }
+
+/* ── Versions/Remixes ── */
+.rd-versions { margin: var(--space-3) 0; }
+.rd-versions-toggle {
+  background: none; border: none; cursor: pointer;
+  font-size: var(--text-sm); color: var(--accent);
+  font-weight: 600; padding: 0;
+}
+.rd-versions-toggle:hover { text-decoration: underline; }
+.rd-versions-list {
+  list-style: none; margin: var(--space-2) 0 0; padding: 0;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden;
+}
+.rd-version-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--space-3) var(--space-4); cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.rd-version-item:last-child { border-bottom: none; }
+.rd-version-item:hover { background: var(--bg); }
+.rd-version-name { font-size: var(--text-sm); font-weight: 600; }
+.rd-version-by { font-size: var(--text-xs); color: var(--text-tertiary); }
 
 /* ── Skeletons ── */
 .rd-skeleton-hero {

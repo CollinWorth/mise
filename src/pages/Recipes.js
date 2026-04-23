@@ -3,23 +3,28 @@ import { useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../api';
 import './css/Recipes.css';
 
-const CUISINE_GRADIENTS = {
-  italian:       'linear-gradient(135deg, #8B1A1A 0%, #C0392B 100%)',
-  mexican:       'linear-gradient(135deg, #1A5C2A 0%, #E67E22 100%)',
-  japanese:      'linear-gradient(135deg, #6D1A4A 0%, #C0392B 100%)',
-  chinese:       'linear-gradient(135deg, #8B1A1A 0%, #C0392B 100%)',
-  indian:        'linear-gradient(135deg, #7D4A00 0%, #E67E22 100%)',
-  american:      'linear-gradient(135deg, #1A2A5C 0%, #2C3E50 100%)',
-  french:        'linear-gradient(135deg, #1A1A5C 0%, #2980B9 100%)',
-  thai:          'linear-gradient(135deg, #1A5C2A 0%, #F39C12 100%)',
-  mediterranean: 'linear-gradient(135deg, #1A3A5C 0%, #16A085 100%)',
-  greek:         'linear-gradient(135deg, #1A2A6C 0%, #2980B9 100%)',
-  default:       'linear-gradient(135deg, #2C2C2C 0%, #4A4A4A 100%)',
-};
+const SORT_OPTIONS = [
+  { value: 'default',  label: 'Default' },
+  { value: 'az',       label: 'A → Z' },
+  { value: 'za',       label: 'Z → A' },
+  { value: 'quickest', label: 'Quickest' },
+  { value: 'fewest',   label: 'Fewest ingredients' },
+];
 
-function cuisineGradient(cuisine) {
-  return CUISINE_GRADIENTS[(cuisine || '').toLowerCase()] || CUISINE_GRADIENTS.default;
-}
+const CUISINE_BG = {
+  italian:       '#F5EDE8',
+  mexican:       '#E9F2E9',
+  japanese:      '#F2EDF4',
+  chinese:       '#F5EDEC',
+  indian:        '#F5F0E8',
+  american:      '#EBF0F5',
+  french:        '#EEF0F8',
+  thai:          '#F3F2E7',
+  mediterranean: '#E8F2EF',
+  greek:         '#EDF0F8',
+  korean:        '#F4EDF2',
+};
+const cuisineBg = c => (c && CUISINE_BG[c.toLowerCase()]) || '#F2F0EB';
 
 function totalTime(recipe) {
   const t = (recipe.prep_time || 0) + (recipe.cook_time || 0);
@@ -31,6 +36,8 @@ export default function Recipes({ user }) {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState('default');
+  const [failedImages, setFailedImages] = useState(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,32 +64,33 @@ export default function Recipes({ user }) {
     );
   }
 
-  const cuisineSet  = new Set(recipes.map(r => r.cuisine).filter(Boolean));
-  const categorySet = new Set(recipes.map(r => r.category).filter(Boolean));
-  const tagSet = new Set(
-    recipes.flatMap(r => r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [])
-  );
-  const allFilters = [
-    'All',
-    ...Array.from(cuisineSet),
-    ...Array.from(categorySet).filter(c => !cuisineSet.has(c)),
-    ...Array.from(tagSet).filter(t => !cuisineSet.has(t) && !categorySet.has(t)),
-  ];
+  const cuisines = ['All', ...Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean)))];
 
-  const filtered = recipes.filter(r => {
+  const filtered = (() => {
     const q = search.toLowerCase();
-    const matchSearch = !q
-      || r.recipe_name.toLowerCase().includes(q)
-      || (r.category || '').toLowerCase().includes(q)
-      || (r.cuisine  || '').toLowerCase().includes(q)
-      || (r.tags     || '').toLowerCase().includes(q);
-    const recipeTags = r.tags ? r.tags.split(',').map(t => t.trim().toLowerCase()) : [];
-    const matchFilter = activeFilter === 'All'
-      || r.cuisine  === activeFilter
-      || r.category === activeFilter
-      || recipeTags.includes(activeFilter.toLowerCase());
-    return matchSearch && matchFilter;
-  });
+    let list = recipes.filter(r => {
+      const matchSearch = !q
+        || r.recipe_name.toLowerCase().includes(q)
+        || (r.category || '').toLowerCase().includes(q)
+        || (r.cuisine  || '').toLowerCase().includes(q)
+        || (r.tags     || '').toLowerCase().includes(q);
+      const matchFilter = activeFilter === 'All' || r.cuisine === activeFilter;
+      return matchSearch && matchFilter;
+    });
+    if (sort === 'az') list = [...list].sort((a, b) => a.recipe_name.localeCompare(b.recipe_name));
+    else if (sort === 'za') list = [...list].sort((a, b) => b.recipe_name.localeCompare(a.recipe_name));
+    else if (sort === 'quickest') list = [...list].sort((a, b) => {
+      const ta = (a.prep_time || 0) + (a.cook_time || 0);
+      const tb = (b.prep_time || 0) + (b.cook_time || 0);
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return ta - tb;
+    });
+    else if (sort === 'fewest') list = [...list].sort((a, b) =>
+      (a.ingredients?.length || 0) - (b.ingredients?.length || 0));
+    return list;
+  })();
 
   // const [featured, ...rest] = filtered;
 
@@ -105,16 +113,26 @@ export default function Recipes({ user }) {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          <select
+            className="recipes-sort-select"
+            value={sort}
+            onChange={e => setSort(e.target.value)}
+            aria-label="Sort recipes"
+          >
+            {SORT_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
           <button className="btn-primary" onClick={() => navigate('/recipes/add')}>
             + Add Recipe
           </button>
         </div>
       </div>
 
-      {/* Filter chips */}
-      {allFilters.length > 1 && (
+      {/* Filter chips — cuisine only */}
+      {cuisines.length > 1 && (
         <div className="recipes-filters">
-          {allFilters.map(f => (
+          {cuisines.map(f => (
             <button
               key={f}
               className={`filter-chip${activeFilter === f ? ' filter-chip--active' : ''}`}
@@ -146,31 +164,46 @@ export default function Recipes({ user }) {
         /* Grid */
         filtered.length > 0 && (
           <div className="recipe-grid">
-            {filtered.map((recipe, idx) => (
-              <div
-                key={recipe._id || recipe.id || idx}
-                className="recipe-card"
-                onClick={() => navigate(`/recipes/${recipe._id || recipe.id}`)}
-              >
-                <div className="recipe-card-img">
-                  {recipe.image_url
-                    ? <img src={recipe.image_url} alt={recipe.recipe_name} />
-                    : <div className="recipe-placeholder" style={{ background: cuisineGradient(recipe.cuisine) }} />
-                  }
-                  <div className="recipe-card-overlay">
-                    <div className="recipe-card-tags">
-                      {recipe.cuisine && <span className="recipe-overlay-badge">{recipe.cuisine}</span>}
-                      {recipe.tags && recipe.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 2).map(t => (
-                        <span key={t} className="recipe-overlay-badge recipe-overlay-tag">{t}</span>
-                      ))}
-                      {totalTime(recipe) && <span className="recipe-overlay-time">{totalTime(recipe)}</span>}
+            {filtered.map((recipe, idx) => {
+              const rid = recipe._id || recipe.id || idx;
+              const hasImage = recipe.image_url && !failedImages.has(rid);
+              return (
+                <div
+                  key={rid}
+                  className={`recipe-card${hasImage ? '' : ' recipe-card--text'}`}
+                  onClick={() => navigate(`/recipes/${recipe._id || recipe.id}`)}
+                >
+                  {hasImage ? (
+                    <div className="recipe-card-img">
+                      <img
+                        src={recipe.image_url}
+                        alt={recipe.recipe_name}
+                        onError={() => setFailedImages(prev => new Set(prev).add(rid))}
+                      />
+                      <div className="recipe-card-overlay">
+                        <div className="recipe-card-tags">
+                          {recipe.cuisine && <span className="recipe-overlay-badge">{recipe.cuisine}</span>}
+                          {recipe.tags && recipe.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 2).map(t => (
+                            <span key={t} className="recipe-overlay-badge recipe-overlay-tag">{t}</span>
+                          ))}
+                          {totalTime(recipe) && <span className="recipe-overlay-time">{totalTime(recipe)}</span>}
+                        </div>
+                        <div className="recipe-card-title">{recipe.recipe_name}</div>
+                        {recipe.servings && <div className="recipe-card-sub">Serves {recipe.servings}</div>}
+                      </div>
                     </div>
-                    <div className="recipe-card-title">{recipe.recipe_name}</div>
-                    {recipe.servings && <div className="recipe-card-sub">Serves {recipe.servings}</div>}
-                  </div>
+                  ) : (
+                    <div className="recipe-card-text" style={{ background: cuisineBg(recipe.cuisine) }}>
+                      <div className="recipe-card-title">{recipe.recipe_name}</div>
+                      <div className="recipe-card-sub">
+                        {[recipe.cuisine, totalTime(recipe), recipe.servings && `Serves ${recipe.servings}`]
+                          .filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       )}

@@ -4,12 +4,12 @@ import { apiFetch } from '../api';
 import './css/ExplorePage.css';
 // Note: uses own card styles — intentionally different from Recipes page
 
-const CUISINE_EMOJI = {
-  italian:'🍝', mexican:'🌮', japanese:'🍱', chinese:'🥡',
-  indian:'🍛', american:'🍔', french:'🥐', thai:'🍜',
-  mediterranean:'🫒', greek:'🫙',
+const CUISINE_BG = {
+  italian:'#F5EDE8', mexican:'#E9F2E9', japanese:'#F2EDF4', chinese:'#F5EDEC',
+  indian:'#F5F0E8', american:'#EBF0F5', french:'#EEF0F8', thai:'#F3F2E7',
+  mediterranean:'#E8F2EF', greek:'#EDF0F8', korean:'#F4EDF2',
 };
-const cuisineEmoji = c => (c && CUISINE_EMOJI[c.toLowerCase()]) || '🍽';
+const cuisineBg = c => (c && CUISINE_BG[c.toLowerCase()]) || '#F2F0EB';
 
 const STATIC_TABS = [
   { id: 'all',      label: 'All' },
@@ -33,6 +33,7 @@ export default function ExplorePage({ user }) {
   const [likeCounts, setLikeCounts] = useState({});
   const [savedIds, setSavedIds]     = useState(new Set());
   const [savingId, setSavingId]     = useState(null);
+  const [failedImages, setFailedImages] = useState(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,26 +49,19 @@ export default function ExplorePage({ user }) {
       .catch(() => setLoading(false));
   }, []);
 
-  // Persist liked IDs to localStorage
   const persistLiked = useCallback((set) => {
     localStorage.setItem('mise_liked', JSON.stringify([...set]));
   }, []);
 
   const handleLike = async (e, recipeId) => {
     e.stopPropagation();
-    const isLiked = likedIds.has(recipeId);
-    const endpoint = isLiked ? `/recipes/${recipeId}/unlike` : `/recipes/${recipeId}/like`;
-
-    // Optimistic update
-    const delta = isLiked ? -1 : 1;
-    setLikeCounts(prev => ({ ...prev, [recipeId]: Math.max(0, (prev[recipeId] || 0) + delta) }));
+    if (likedIds.has(recipeId)) return;
+    setLikeCounts(prev => ({ ...prev, [recipeId]: (prev[recipeId] || 0) + 1 }));
     const next = new Set(likedIds);
-    isLiked ? next.delete(recipeId) : next.add(recipeId);
+    next.add(recipeId);
     setLikedIds(next);
     persistLiked(next);
-
-    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({}) }); }
-    catch { /* revert on failure */ setLikeCounts(prev => ({ ...prev, [recipeId]: Math.max(0, (prev[recipeId] || 0) - delta) })); }
+    try { await apiFetch(`/recipes/${recipeId}/like`, { method: 'POST', body: JSON.stringify({}) }); } catch {}
   };
 
   const handleSave = async (e, recipeId) => {
@@ -106,7 +100,7 @@ export default function ExplorePage({ user }) {
     });
   }
 
-  // Apply search (name + category + cuisine + tags + ingredients hint)
+  // Apply search
   if (search.trim()) {
     const q = search.toLowerCase();
     filtered = filtered.filter(r =>
@@ -177,23 +171,29 @@ export default function ExplorePage({ user }) {
             const saved = savedIds.has(id);
             const count = likeCounts[id] ?? 0;
             const time = fmtTime(recipe);
+            const hasImage = recipe.image_url && !failedImages.has(id);
 
             return (
               <article
                 key={id}
-                className="ex-card"
+                className={`ex-card${hasImage ? '' : ' ex-card--no-image'}`}
+                style={hasImage ? {} : { background: cuisineBg(recipe.cuisine) }}
                 onClick={() => navigate(`/recipes/${id}`)}
               >
                 {/* Image */}
-                <div className="ex-card-img">
-                  {recipe.image_url
-                    ? <img src={recipe.image_url} alt={recipe.recipe_name} loading="lazy" />
-                    : <div className="ex-card-emoji">{cuisineEmoji(recipe.cuisine)}</div>
-                  }
-                  {recipe.cuisine && (
-                    <span className="ex-card-cuisine">{recipe.cuisine}</span>
-                  )}
-                </div>
+                {hasImage && (
+                  <div className="ex-card-img">
+                    <img
+                      src={recipe.image_url}
+                      alt={recipe.recipe_name}
+                      loading="lazy"
+                      onError={() => setFailedImages(prev => new Set(prev).add(id))}
+                    />
+                    {recipe.cuisine && (
+                      <span className="ex-card-cuisine">{recipe.cuisine}</span>
+                    )}
+                  </div>
+                )}
 
                 {/* Body */}
                 <div className="ex-card-body">
@@ -206,6 +206,11 @@ export default function ExplorePage({ user }) {
                       <span key={t} className="ex-card-tag">{t}</span>
                     ))}
                   </div>
+                  {recipe.is_modified && recipe.original_author_name && (
+                    <div className="ex-card-remix">
+                      ↪ modified from {recipe.original_author_name}
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer */}
@@ -214,7 +219,7 @@ export default function ExplorePage({ user }) {
                     <a
                       href={`/users/${recipe.user_id}`}
                       className="ex-card-author"
-                      onClick={e => { e.stopPropagation(); e.preventDefault(); window.location.href = `/users/${recipe.user_id}`; }}
+                      onClick={e => { e.stopPropagation(); e.preventDefault(); navigate(`/users/${recipe.user_id}`); }}
                     >
                       <span className="ex-card-author-avatar">{recipe.author_name[0].toUpperCase()}</span>
                       <span className="ex-card-author-name">{recipe.author_name}</span>

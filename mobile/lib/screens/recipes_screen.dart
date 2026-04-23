@@ -247,43 +247,9 @@ class RecipesScreenState extends State<RecipesScreen> {
           // Featured card
           GestureDetector(
             onTap: () => _openRecipe(featured),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: SizedBox(
-                height: 260,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _recipeImage(featured, BoxFit.cover),
-                    Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Color(0xDD0A0A0A)],
-                          stops: [0.4, 1.0],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 20, left: 20, right: 20,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (featured.cuisine.isNotEmpty) _badge(featured.cuisine),
-                          const SizedBox(height: 8),
-                          Text(featured.name,
-                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
-                          if (featured.totalTime > 0)
-                            Text('${featured.totalTime} min',
-                              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: featured.imageUrl != null
+              ? _featuredImageCard(featured)
+              : _featuredTextCard(featured),
           ),
           const SizedBox(height: 16),
           // Grid
@@ -297,43 +263,177 @@ class RecipesScreenState extends State<RecipesScreen> {
               itemCount: rest.length,
               itemBuilder: (_, i) => GestureDetector(
                 onTap: () => _openRecipe(rest[i]),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _recipeImage(rest[i], BoxFit.cover),
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Color(0xCC0A0A0A)],
-                            stops: [0.4, 1.0],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 12, left: 12, right: 12,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (rest[i].cuisine.isNotEmpty) _badge(rest[i].cuisine),
-                            const SizedBox(height: 4),
-                            Text(rest[i].name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-                            if (rest[i].totalTime > 0)
-                              Text('${rest[i].totalTime} min',
-                                style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                child: rest[i].imageUrl != null
+                  ? _gridImageCard(rest[i])
+                  : _gridTextCard(rest[i]),
               ),
             ),
         ]),
       ),
+    );
+  }
+
+  Widget _featuredImageCard(Recipe r) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 260,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _recipeImage(r, BoxFit.cover),
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xDD0A0A0A)],
+                  stops: [0.4, 1.0],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 20, left: 20, right: 20,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (r.cuisine.isNotEmpty) _badge(r.cuisine),
+                const SizedBox(height: 8),
+                Text(r.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                if (r.totalTime > 0)
+                  Text('${r.totalTime} min',
+                    style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13)),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _featuredTextCard(Recipe r) {
+    final bg   = _cardBg(r.cuisine);
+    final text = _cardText(r.cuisine);
+    final tags = r.tags.isNotEmpty
+      ? r.tags.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).take(3).toList()
+      : <String>[];
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 260,
+        child: Container(
+          color: bg,
+          padding: const EdgeInsets.all(22),
+          child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top row: pills + time
+                  Row(children: [
+                    if (r.cuisine.isNotEmpty) ...[
+                      _textCardPill(r.cuisine, text),
+                      const SizedBox(width: 6),
+                    ],
+                    if (r.category.isNotEmpty && r.category != r.cuisine) ...[
+                      _textCardPill(r.category, text),
+                      const SizedBox(width: 6),
+                    ],
+                    const Spacer(),
+                    if (r.totalTime > 0)
+                      Text('${r.totalTime} min',
+                        style: TextStyle(fontSize: 12, color: text.withOpacity(0.45), fontWeight: FontWeight.w500)),
+                  ]),
+                  const Spacer(),
+                  // Name
+                  Text(r.name,
+                    maxLines: 3, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800,
+                      color: text, letterSpacing: -0.5, height: 1.15)),
+                  if (tags.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 5, runSpacing: 5,
+                      children: tags.map((t) => _textCardPill(t, text)).toList()),
+                  ],
+                ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _gridImageCard(Recipe r) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _recipeImage(r, BoxFit.cover),
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Color(0xCC0A0A0A)],
+                stops: [0.4, 1.0],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 12, left: 12, right: 12,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (r.cuisine.isNotEmpty) _badge(r.cuisine),
+              const SizedBox(height: 4),
+              Text(r.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+              if (r.totalTime > 0)
+                Text('${r.totalTime} min',
+                  style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _gridTextCard(Recipe r) {
+    final bg   = _cardBg(r.cuisine);
+    final text = _cardText(r.cuisine);
+    final topLabel = r.cuisine.isNotEmpty ? r.cuisine : (r.category.isNotEmpty ? r.category : null);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        color: bg,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (topLabel != null) ...[
+              _textCardPill(topLabel, text),
+              const SizedBox(height: 7),
+            ],
+            Text(r.name,
+              maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                color: text, height: 1.2, letterSpacing: -0.2)),
+            if (r.totalTime > 0) ...[
+              const SizedBox(height: 3),
+              Text('${r.totalTime}m',
+                style: TextStyle(fontSize: 11, color: text.withOpacity(0.45), fontWeight: FontWeight.w500)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _textCardPill(String label, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: textColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: textColor.withOpacity(0.12)),
+      ),
+      child: Text(label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textColor.withOpacity(0.7))),
     );
   }
 
@@ -343,33 +443,44 @@ class RecipesScreenState extends State<RecipesScreen> {
     )).then((_) => _load()); // refresh in case recipe was edited
   }
 
+  static const _cuisineBg = {
+    'italian':       Color(0xFFF5EDE8),
+    'mexican':       Color(0xFFE9F2E9),
+    'japanese':      Color(0xFFF2EDF4),
+    'chinese':       Color(0xFFF5EDEC),
+    'indian':        Color(0xFFF5F0E8),
+    'american':      Color(0xFFEBF0F5),
+    'french':        Color(0xFFEEF0F8),
+    'thai':          Color(0xFFF3F2E7),
+    'mediterranean': Color(0xFFE8F2EF),
+    'greek':         Color(0xFFEDF0F8),
+    'korean':        Color(0xFFF4EDF2),
+  };
+
+  Color _cardBg(String cuisine) {
+    final base = _cuisineBg[cuisine.toLowerCase()] ?? const Color(0xFFF2F0EB);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark ? Color.lerp(base, const Color(0xFF1A1918), 0.72)! : base;
+  }
+
+  Color _cardText(String cuisine) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark ? const Color(0xFFECEAE6) : const Color(0xFF1A1918);
+  }
+
   Widget _recipeImage(Recipe r, BoxFit fit) {
     if (r.imageUrl != null) {
       return CachedNetworkImage(
         imageUrl: r.imageUrl!, fit: fit,
-        errorWidget: (_, __, ___) => _cuisineGradient(r.cuisine),
+        errorWidget: (_, __, ___) => _buildImageErrorCard(r),
       );
     }
-    return _cuisineGradient(r.cuisine);
+    return _buildImageErrorCard(r);
   }
 
-  Widget _cuisineGradient(String cuisine) {
-    final gradients = {
-      'italian':  [const Color(0xFF8B1A1A), const Color(0xFFC0392B)],
-      'mexican':  [const Color(0xFF1A5C2A), const Color(0xFFE67E22)],
-      'japanese': [const Color(0xFF6D1A4A), const Color(0xFFC0392B)],
-      'indian':   [const Color(0xFF7D4A00), const Color(0xFFE67E22)],
-      'american': [const Color(0xFF1A2A5C), const Color(0xFF2C3E50)],
-      'french':   [const Color(0xFF1A1A5C), const Color(0xFF2980B9)],
-      'thai':     [const Color(0xFF1A5C2A), const Color(0xFFF39C12)],
-      'greek':    [const Color(0xFF1A2A6C), const Color(0xFF2980B9)],
-    };
-    final colors = gradients[cuisine.toLowerCase()] ?? [const Color(0xFF2C2C2C), const Color(0xFF4A4A4A)];
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-      ),
-    );
+  // Pastel fallback fill used inside Stack when image fails to load
+  Widget _buildImageErrorCard(Recipe r) {
+    return Container(color: _cardBg(r.cuisine));
   }
 
   Widget _badge(String text) {

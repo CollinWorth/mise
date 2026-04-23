@@ -22,6 +22,9 @@ class Recipe(BaseModel):
     is_public: bool = False
     like_count: int = 0
     user_id: str
+    original_recipe_id: Optional[str] = None
+    original_author_name: Optional[str] = None
+    is_modified: bool = False
 
 class GroceryItem(BaseModel):
     name: str

@@ -21,10 +21,11 @@ abstract class AppStorage {
   Future<void> addGroceryItem(String listId, Map<String, dynamic> item);
   Future<void> toggleGroceryItem(String listId, String itemName);
   Future<void> removeGroceryItem(String listId, String itemName);
+  Future<void> clearGroceryItems(String listId, {bool checkedOnly = false});
 
   // Meal plans — returns merged {recipe fields + mealPlanId}
   Future<List<Map<String, dynamic>>> getDayMeals(String userId, String date);
-  Future<Map<String, dynamic>> addMealPlan(String userId, String date, String recipeId, Map<String, dynamic> recipeData);
+  Future<Map<String, dynamic>> addMealPlan(String userId, String date, String recipeId, Map<String, dynamic> recipeData, {int multiplier = 1});
   Future<void> deleteMealPlan(String id);
 }
 

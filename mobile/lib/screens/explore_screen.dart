@@ -5,24 +5,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
 import '../storage/storage.dart';
 import 'public_recipe_detail_screen.dart';
+import 'user_profile_screen.dart';
 
-const _kAccent = Color(0xFFE8622A);
+const _kAccent  = Color(0xFFE8622A);
 const _kSurface = Colors.white;
-const _kBorder = Color(0xFFE5E2DC);
-const _kBg = Color(0xFFF7F6F3);
+const _kBorder  = Color(0xFFE5E2DC);
+const _kBg      = Color(0xFFF7F6F3);
 const _kTextSec = Color(0xFF888480);
+const _kText    = Color(0xFF1A1918);
 
-const _cuisineEmoji = {
-  'italian': '🍝', 'mexican': '🌮', 'japanese': '🍱', 'chinese': '🥡',
-  'indian': '🍛', 'american': '🍔', 'french': '🥐', 'thai': '🍜',
-  'mediterranean': '🫒', 'greek': '🫙',
+const _cuisineBg = {
+  'italian':       Color(0xFFF5EDE8),
+  'mexican':       Color(0xFFE9F2E9),
+  'japanese':      Color(0xFFF2EDF4),
+  'chinese':       Color(0xFFF5EDEC),
+  'indian':        Color(0xFFF5F0E8),
+  'american':      Color(0xFFEBF0F5),
+  'french':        Color(0xFFEEF0F8),
+  'thai':          Color(0xFFF3F2E7),
+  'mediterranean': Color(0xFFE8F2EF),
+  'greek':         Color(0xFFEDF0F8),
+  'korean':        Color(0xFFF4EDF2),
 };
-String _emoji(String? c) => (c != null ? _cuisineEmoji[c.toLowerCase()] : null) ?? '🍽';
+Color _getBg(String? c) => (c != null ? _cuisineBg[c.toLowerCase()] : null) ?? const Color(0xFFF2F0EB);
 
 class ExploreScreen extends StatefulWidget {
   final Map<String, dynamic> user;
   final bool embedded;
-  const ExploreScreen({super.key, required this.user, this.embedded = false});
+  final VoidCallback? onRecipeSaved;
+  const ExploreScreen({super.key, required this.user, this.embedded = false, this.onRecipeSaved});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -85,19 +96,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Future<void> _toggleLike(String id) async {
-    final wasLiked = _likedIds.contains(id);
-    final delta = wasLiked ? -1 : 1;
+    if (_likedIds.contains(id)) return;
     setState(() {
-      wasLiked ? _likedIds.remove(id) : _likedIds.add(id);
-      _likeCounts[id] = ((_likeCounts[id] ?? 0) + delta).clamp(0, 999999);
+      _likedIds.add(id);
+      _likeCounts[id] = ((_likeCounts[id] ?? 0) + 1).clamp(0, 999999);
     });
     await _persistLiked();
     try {
-      await Api.post('/recipes/$id/${wasLiked ? 'unlike' : 'like'}', {});
+      await Api.post('/recipes/$id/like', {});
     } catch (_) {
       setState(() {
-        wasLiked ? _likedIds.add(id) : _likedIds.remove(id);
-        _likeCounts[id] = ((_likeCounts[id] ?? 0) - delta).clamp(0, 999999);
+        _likedIds.remove(id);
+        _likeCounts[id] = ((_likeCounts[id] ?? 1) - 1).clamp(0, 999999);
       });
     }
   }
@@ -107,7 +117,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
     setState(() => _savingId = id);
     try {
       final r = await Api.post('/recipes/$id/save', {});
-      if (r.statusCode == 200 && mounted) setState(() => _savedIds.add(id));
+      if (r.statusCode == 200 && mounted) {
+        setState(() => _savedIds.add(id));
+        widget.onRecipeSaved?.call();
+      }
     } catch (_) {}
     if (mounted) setState(() => _savingId = null);
   }
@@ -116,9 +129,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final cats = <String>{};
     final cuisines = <String>{};
     for (final r in _recipes) {
-      final c = r['category'] as String?;
-      final cu = r['cuisine'] as String?;
-      if (c != null && c.isNotEmpty) cats.add(c);
+      final c  = r['category'] as String?;
+      final cu = r['cuisine']  as String?;
+      if (c  != null && c.isNotEmpty)  cats.add(c);
       if (cu != null && cu.isNotEmpty) cuisines.add(cu);
     }
     return ['all', 'trending', 'quick', ...cats, ...cuisines.where((c) => !cats.contains(c))];
@@ -143,9 +156,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       final q = _search.toLowerCase();
       list = list.where((r) =>
         (r['recipe_name'] as String? ?? '').toLowerCase().contains(q) ||
-        (r['category'] as String? ?? '').toLowerCase().contains(q) ||
-        (r['cuisine'] as String? ?? '').toLowerCase().contains(q) ||
-        (r['tags'] as String? ?? '').toLowerCase().contains(q)
+        (r['category']    as String? ?? '').toLowerCase().contains(q) ||
+        (r['cuisine']     as String? ?? '').toLowerCase().contains(q) ||
+        (r['tags']        as String? ?? '').toLowerCase().contains(q)
       ).toList();
     }
     return list;
@@ -153,10 +166,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   String _tabLabel(String id) {
     switch (id) {
-      case 'all': return 'All';
+      case 'all':      return 'All';
       case 'trending': return '🔥 Trending';
-      case 'quick': return '⚡ Quick';
-      default: return id;
+      case 'quick':    return '⚡ Quick';
+      default:         return id;
     }
   }
 
@@ -174,7 +187,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
     }
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,6 +222,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildSearch() {
+    final surface  = Theme.of(context).colorScheme.surface;
+    final border   = Theme.of(context).dividerColor;
+    final textSec  = Theme.of(context).colorScheme.onSurface.withOpacity(0.45);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: TextField(
@@ -216,12 +232,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
         onChanged: (v) => setState(() => _search = v),
         decoration: InputDecoration(
           hintText: 'Search recipes…',
-          hintStyle: const TextStyle(color: Color(0xFFBBB8B2), fontSize: 14),
-          prefixIcon: const Icon(Icons.search, size: 17, color: _kTextSec),
-          filled: true, fillColor: _kSurface,
+          hintStyle: TextStyle(color: textSec, fontSize: 14),
+          prefixIcon: Icon(Icons.search, size: 17, color: textSec),
+          filled: true, fillColor: surface,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorder)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorder)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: border)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: border)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kAccent)),
         ),
       ),
@@ -229,6 +245,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildTabs() {
+    final surface   = Theme.of(context).colorScheme.surface;
+    final border    = Theme.of(context).dividerColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Container(
       margin: const EdgeInsets.only(top: 12),
       height: 34,
@@ -245,14 +264,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: active ? const Color(0xFF1A1918) : _kSurface,
+                color: active ? onSurface : surface,
                 borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: active ? const Color(0xFF1A1918) : _kBorder, width: 1.5),
+                border: Border.all(color: active ? onSurface : border, width: 1.5),
               ),
               child: Text(
                 _tabLabel(tab),
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : const Color(0xFF555250)),
+                  color: active ? Theme.of(context).colorScheme.surface : onSurface.withOpacity(0.6)),
               ),
             ),
           );
@@ -271,25 +290,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
             children: [
               const Text('🌍', style: TextStyle(fontSize: 48)),
               const SizedBox(height: 16),
-              const Text('Explore requires server mode', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              const Text('Explore requires server mode',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Text('Connect to a mise server to browse shared recipes.',
+              const Text('Connect to a mise server to browse shared recipes.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: _kTextSec)),
+                style: TextStyle(fontSize: 14, color: _kTextSec)),
             ],
           ),
         ),
       );
     }
     if (_loading) {
-      return GridView.builder(
+      return SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 0.68,
-        ),
-        itemCount: 6,
-        itemBuilder: (_, __) => Container(
-          decoration: BoxDecoration(color: _kBorder, borderRadius: BorderRadius.circular(14)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(children: List.generate(3, (i) => _buildSkeletonCard(i.isEven ? 140.0 : 100.0))),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(children: [
+                const SizedBox(height: 40),
+                ...List.generate(3, (i) => _buildSkeletonCard(i.isEven ? 100.0 : 140.0)),
+              ]),
+            ),
+          ],
         ),
       );
     }
@@ -318,164 +346,244 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
       );
     }
-    return GridView.builder(
+
+    // Manual two-column masonry
+    final left  = <Map<String, dynamic>>[];
+    final right = <Map<String, dynamic>>[];
+    for (var i = 0; i < items.length; i++) {
+      (i.isEven ? left : right).add(items[i]);
+    }
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 0.66,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) => _RecipeCard(
-        recipe: items[i],
-        liked: _likedIds.contains(items[i]['_id'] as String),
-        likeCount: _likeCounts[items[i]['_id'] as String] ?? 0,
-        saved: _savedIds.contains(items[i]['_id'] as String),
-        saving: _savingId == items[i]['_id'],
-        onLike: () => _toggleLike(items[i]['_id'] as String),
-        onSave: () => _save(items[i]['_id'] as String),
-        onTap: () async {
-          final id = items[i]['_id'] as String;
-          final wasLiked = _likedIds.contains(id);
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => PublicRecipeDetailScreen(recipe: items[i], user: widget.user)),
-          );
-          await _loadLiked();
-          final isNowLiked = _likedIds.contains(id);
-          if (wasLiked != isNowLiked && mounted) {
-            setState(() => _likeCounts[id] = ((_likeCounts[id] ?? 0) + (isNowLiked ? 1 : -1)).clamp(0, 999999));
-          }
-        },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Column(children: left.map(_buildCard).toList())),
+          const SizedBox(width: 10),
+          Expanded(child: Column(children: right.map(_buildCard).toList())),
+        ],
       ),
     );
   }
-}
 
-class _RecipeCard extends StatelessWidget {
-  final Map<String, dynamic> recipe;
-  final bool liked;
-  final int likeCount;
-  final bool saved;
-  final bool saving;
-  final VoidCallback onLike;
-  final VoidCallback onSave;
-  final VoidCallback onTap;
+  Widget _buildSkeletonCard(double imageHeight) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: _kBorder,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Container(height: imageHeight, color: _kBorder),
+          Container(height: 64, decoration: const BoxDecoration(
+            color: _kSurface,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
+          )),
+        ],
+      ),
+    );
+  }
 
-  const _RecipeCard({
-    required this.recipe, required this.liked, required this.likeCount,
-    required this.saved, required this.saving,
-    required this.onLike, required this.onSave, required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = recipe['image_url'] as String?;
-    final cuisine = recipe['cuisine'] as String? ?? '';
-    final category = recipe['category'] as String? ?? '';
-    final name = recipe['recipe_name'] as String? ?? '';
+  Widget _buildCard(Map<String, dynamic> recipe) {
+    final id         = recipe['_id'] as String;
+    final imageUrl   = recipe['image_url'] as String?;
+    final hasImage   = imageUrl != null && imageUrl.isNotEmpty;
+    final name       = recipe['recipe_name'] as String? ?? '';
+    final cuisine    = recipe['cuisine']     as String? ?? '';
+    final category   = recipe['category']   as String? ?? '';
     final authorName = recipe['author_name'] as String?;
+    final authorId   = recipe['user_id']    as String?;
     final prep = (recipe['prep_time'] as num?)?.toInt() ?? 0;
     final cook = (recipe['cook_time'] as num?)?.toInt() ?? 0;
     final total = prep + cook;
+    final liked      = _likedIds.contains(id);
+    final saved      = _savedIds.contains(id);
+    final likeCount  = _likeCounts[id] ?? 0;
+    final saving     = _savingId == id;
+    final dark       = Theme.of(context).brightness == Brightness.dark;
+    final surface    = Theme.of(context).colorScheme.surface;
+    final border     = Theme.of(context).dividerColor;
+    final textSec    = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+    final noImgBg    = dark
+        ? Color.lerp(_getBg(cuisine), const Color(0xFF1A1918), 0.72)!
+        : _getBg(cuisine);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () async {
+        final wasLiked = _likedIds.contains(id);
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PublicRecipeDetailScreen(recipe: recipe, user: widget.user)),
+        );
+        await _loadLiked();
+        final isNowLiked = _likedIds.contains(id);
+        if (wasLiked != isNowLiked && mounted) {
+          setState(() => _likeCounts[id] = ((_likeCounts[id] ?? 0) + (isNowLiked ? 1 : -1)).clamp(0, 999999));
+        }
+      },
       child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: _kSurface,
+          color: hasImage ? surface : noImgBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kBorder, width: 1.5),
+          border: hasImage ? Border.all(color: border, width: 1.5) : null,
+          boxShadow: hasImage ? null : [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
         ),
         clipBehavior: Clip.hardEdge,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image (3:2 ratio)
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  imageUrl != null && imageUrl.isNotEmpty
-                      ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover)
-                      : Container(
-                          color: const Color(0xFFF0EEE9),
-                          child: Center(child: Text(_emoji(cuisine), style: const TextStyle(fontSize: 36))),
-                        ),
-                  if (cuisine.isNotEmpty)
-                    Positioned(
-                      top: 8, left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.65),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: Text(cuisine, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+            // Image
+            if (hasImage)
+              AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: imageUrl!,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => Container(
+                        color: _getBg(cuisine),
+                        alignment: Alignment.center,
+                        child: Text(name[0].toUpperCase(),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFFBBB8B2))),
                       ),
                     ),
+                    if (cuisine.isNotEmpty)
+                      Positioned(
+                        top: 8, left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.60),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(cuisine,
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+            // Body
+            Padding(
+              padding: EdgeInsets.fromLTRB(10, hasImage ? 8 : 12, 10, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                    style: TextStyle(
+                      fontSize: hasImage ? 12 : 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                      color: _kText,
+                    ),
+                    maxLines: hasImage ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (category.isNotEmpty || total > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (category.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _kAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(category,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kAccent),
+                              overflow: TextOverflow.ellipsis),
+                          ),
+                        if (category.isNotEmpty && total > 0) const SizedBox(width: 5),
+                        if (total > 0)
+                          Text('${total}m', style: TextStyle(fontSize: 10, color: textSec, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
 
-            // Body
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.25),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Row(children: [
-                      if (category.isNotEmpty) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: _kAccent.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(category, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kAccent), overflow: TextOverflow.ellipsis),
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                      if (total > 0)
-                        Text('${total}m', style: const TextStyle(fontSize: 11, color: _kTextSec)),
-                    ]),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        if (authorName != null) ...[
+            // Footer
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
+              child: Row(
+                children: [
+                  if (authorName != null && authorId != null) ...[
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => UserProfileScreen(userId: authorId, currentUser: widget.user))),
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Container(
-                            width: 18, height: 18,
+                            width: 16, height: 16,
                             decoration: const BoxDecoration(color: _kAccent, shape: BoxShape.circle),
                             child: Center(child: Text(authorName[0].toUpperCase(),
-                              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Colors.white))),
+                              style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w700, color: Colors.white))),
                           ),
                           const SizedBox(width: 4),
-                          Expanded(child: Text(authorName,
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: _kTextSec),
-                            overflow: TextOverflow.ellipsis)),
-                        ] else const Spacer(),
-                        GestureDetector(
-                          onTap: onLike,
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Row(children: [
-                              Icon(liked ? Icons.favorite : Icons.favorite_border,
-                                size: 14, color: liked ? _kAccent : const Color(0xFFBBB8B2)),
-                              if (likeCount > 0) ...[
-                                const SizedBox(width: 2),
-                                Text('$likeCount', style: const TextStyle(fontSize: 10, color: _kTextSec, fontWeight: FontWeight.w600)),
-                              ],
-                            ]),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 80),
+                            child: Text(authorName,
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: textSec),
+                              overflow: TextOverflow.ellipsis),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                    const Spacer(),
+                  ] else const Spacer(),
+                  // Like
+                  GestureDetector(
+                    onTap: () => _toggleLike(id),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(children: [
+                        Icon(liked ? Icons.favorite : Icons.favorite_border,
+                          size: 13, color: liked ? _kAccent : textSec),
+                        if (likeCount > 0) ...[
+                          const SizedBox(width: 2),
+                          Text('$likeCount',
+                            style: TextStyle(fontSize: 10, color: textSec, fontWeight: FontWeight.w600)),
+                        ],
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Save
+                  GestureDetector(
+                    onTap: saving ? null : () => _save(id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: saved ? const Color(0xFF34A853) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                          color: saved ? const Color(0xFF34A853) : border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        saving ? '…' : saved ? '✓' : '+',
+                        style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w700,
+                          color: saved ? Colors.white : textSec,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

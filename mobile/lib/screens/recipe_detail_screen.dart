@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
@@ -24,9 +25,17 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   Recipe get recipe => _recipe;
   Map<String, dynamic> get user => widget.user;
 
+  // Serving scaler
+  int _servings = 4;
+  int _baseServings = 0;
+
   // Social state (only used when server mode + recipe is public)
   bool _liked = false;
   late int _likeCount;
+
+  // Versions/remixes
+  List<Map<String, dynamic>> _versions = [];
+  bool _versionsExpanded = false;
 
   bool get _showSocial => Store.isReady && Store.i.mode == StorageMode.server && recipe.isPublic;
 
@@ -34,10 +43,23 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   void initState() {
     super.initState();
     _recipe = widget.recipe;
+    _baseServings = widget.recipe.servings;
+    _servings = _baseServings > 0 ? _baseServings : 4;
     _likeCount = recipe.likeCount;
     if (_showSocial) {
       _loadLiked();
+      _loadVersions();
     }
+  }
+
+  Future<void> _loadVersions() async {
+    try {
+      final r = await Api.get('/recipes/${recipe.id}/versions');
+      if (r.statusCode == 200 && mounted) {
+        final data = jsonDecode(r.body) as List;
+        setState(() => _versions = data.cast<Map<String, dynamic>>());
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadLiked() async {
@@ -50,20 +72,17 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   Future<void> _toggleLike() async {
-    final wasLiked = _liked;
-    setState(() {
-      _liked = !_liked;
-      _likeCount = (_likeCount + (_liked ? 1 : -1)).clamp(0, 999999);
-    });
+    if (_liked) return;
+    setState(() { _liked = true; _likeCount = _likeCount + 1; });
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('mise_liked');
     final list = raw != null ? (jsonDecode(raw) as List).cast<String>() : <String>[];
-    _liked ? (list.contains(recipe.id) ? null : list.add(recipe.id)) : list.remove(recipe.id);
+    if (!list.contains(recipe.id)) list.add(recipe.id);
     await prefs.setString('mise_liked', jsonEncode(list));
     try {
-      await Api.post('/recipes/${recipe.id}/${wasLiked ? 'unlike' : 'like'}', {});
+      await Api.post('/recipes/${recipe.id}/like', {});
     } catch (_) {
-      if (mounted) setState(() { _liked = wasLiked; _likeCount = (_likeCount + (wasLiked ? 1 : -1)).clamp(0, 999999); });
+      if (mounted) setState(() { _liked = false; _likeCount = (_likeCount - 1).clamp(0, 999999); });
     }
   }
 
@@ -111,6 +130,56 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
       }
     }
   }
+
+  double get _scaleFactor => _baseServings > 0 ? _servings / _baseServings : 1.0;
+
+  String _scaleQty(String qty) {
+    if (qty.isEmpty) return qty;
+    final s = qty.trim();
+    final mixed = RegExp(r'^(\d+)\s+(\d+)\s*/\s*(\d+)$').firstMatch(s);
+    if (mixed != null) {
+      final v = (double.parse(mixed.group(1)!) + double.parse(mixed.group(2)!) / double.parse(mixed.group(3)!)) * _scaleFactor;
+      return _fmtNum(v);
+    }
+    final frac = RegExp(r'^(\d+)\s*/\s*(\d+)$').firstMatch(s);
+    if (frac != null) {
+      return _fmtNum(double.parse(frac.group(1)!) / double.parse(frac.group(2)!) * _scaleFactor);
+    }
+    final n = double.tryParse(s);
+    if (n != null) return _fmtNum(n * _scaleFactor);
+    return qty;
+  }
+
+  String _fmtNum(double n) {
+    final r = (n * 4).round() / 4;
+    if (r == r.truncateToDouble()) return '${r.truncate()}';
+    final whole = r.truncate();
+    final frac = r - whole;
+    final fracStr = (frac - 0.25).abs() < 0.01 ? '¼' : (frac - 0.5).abs() < 0.01 ? '½' : '¾';
+    return whole > 0 ? '$whole$fracStr' : fracStr;
+  }
+
+  void _share() {
+    final webBase = kBaseUrl.contains(':8000') ? kBaseUrl.replaceFirst(':8000', ':3000') : kBaseUrl;
+    final url = '$webBase/recipe/${recipe.id}';
+    Clipboard.setData(ClipboardData(text: url));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Link copied to clipboard'), behavior: SnackBarBehavior.floating));
+  }
+
+  Widget _scalerBtn(IconData icon, VoidCallback? onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 28, height: 28,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0EEE9),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: const Color(0xFFE5E2DC)),
+      ),
+      child: Icon(icon, size: 14,
+        color: onTap != null ? const Color(0xFF1A1918) : const Color(0xFFCCCCC0)),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +235,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                 onPressed: () => showAddToGrocerySheet(context, recipe: recipe, user: user),
               ),
               IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white),
+                tooltip: 'Share',
+                onPressed: _share,
+              ),
+              IconButton(
                 icon: const Icon(Icons.edit_outlined, color: Colors.white),
                 onPressed: _openEdit,
               ),
@@ -182,6 +256,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                   recipe.imageUrl != null
                       ? CachedNetworkImage(imageUrl: recipe.imageUrl!, fit: BoxFit.cover)
                       : _cuisineGradient(recipe.cuisine),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                        colors: [Color(0x661A1918), Colors.transparent],
+                        stops: [0.0, 0.38],
+                      ),
+                    ),
+                  ),
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -227,9 +310,61 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                   ),
                   const SizedBox(height: 28),
 
+                  // Versions / remixes
+                  if (_versions.isNotEmpty) ...[
+                    GestureDetector(
+                      onTap: () => setState(() => _versionsExpanded = !_versionsExpanded),
+                      child: Row(children: [
+                        Icon(_versionsExpanded ? Icons.expand_less : Icons.expand_more,
+                          size: 18, color: const Color(0xFFE8622A)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_versions.length} remix${_versions.length != 1 ? 'es' : ''} of this recipe',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFE8622A)),
+                        ),
+                      ]),
+                    ),
+                    if (_versionsExpanded) ...[
+                      const SizedBox(height: 8),
+                      ..._versions.map((v) => Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7F6F3),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFEAEAE5)),
+                          ),
+                          child: Row(children: [
+                            Expanded(child: Text(
+                              v['recipe_name'] as String? ?? '',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            )),
+                            if (v['author_name'] != null)
+                              Text('by ${v['author_name']}',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF9A9893))),
+                          ]),
+                        ),
+                      )),
+                    ],
+                    const SizedBox(height: 20),
+                  ],
+
                   // Ingredients
                   if (recipe.ingredients.isNotEmpty) ...[
-                    const Text('Ingredients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Row(
+                      children: [
+                        const Expanded(child: Text('Ingredients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+                        if (_baseServings > 0) ...[
+                          _scalerBtn(Icons.remove, _servings > 1 ? () => setState(() => _servings--) : null),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('$_servings', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          ),
+                          _scalerBtn(Icons.add, () => setState(() => _servings++)),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     ...recipe.ingredients.map((ing) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -240,7 +375,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                           Expanded(child: Text(ing.name, style: const TextStyle(fontSize: 14))),
                           if (ing.quantity.isNotEmpty || ing.unit.isNotEmpty)
                             Text(
-                              [ing.quantity, ing.unit].where((s) => s.isNotEmpty).join(' '),
+                              [_scaleQty(ing.quantity), ing.unit].where((s) => s.isNotEmpty).join(' '),
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF888480)),
                             ),
                         ],
@@ -307,10 +442,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   Widget _cuisineGradient(String cuisine) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [Color(0xFF2C2C2C), Color(0xFF4A4A4A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-      ),
-    );
+    const pastels = {
+      'italian': Color(0xFFF5EDE8), 'mexican': Color(0xFFE9F2E9),
+      'japanese': Color(0xFFF2EDF4), 'chinese': Color(0xFFF5EDEC),
+      'indian': Color(0xFFF5F0E8), 'american': Color(0xFFEBF0F5),
+      'french': Color(0xFFEEF0F8), 'thai': Color(0xFFF3F2E7),
+      'mediterranean': Color(0xFFE8F2EF), 'greek': Color(0xFFEDF0F8),
+      'korean': Color(0xFFF4EDF2),
+    };
+    return Container(color: pastels[cuisine.toLowerCase()] ?? const Color(0xFFF2F0EB));
   }
 }

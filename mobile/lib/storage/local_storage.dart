@@ -103,6 +103,21 @@ class LocalStorageImpl extends AppStorage {
   }
 
   @override
+  Future<void> clearGroceryItems(String listId, {bool checkedOnly = false}) async {
+    final raw = _grocery.get('list');
+    if (raw == null) return;
+    final list = _toStringMap(raw);
+    final items = (list['items'] as List? ?? []).map(_toStringMap).toList();
+    if (checkedOnly) {
+      items.removeWhere((i) => i['checked'] == true);
+    } else {
+      items.clear();
+    }
+    list['items'] = items;
+    await _grocery.put('list', list);
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getDayMeals(String userId, String date) async {
     return _mealPlans.values
         .map(_toStringMap)
