@@ -225,7 +225,19 @@ export default function RecipeDetails({ user }) {
         {recipe.is_modified && recipe.original_author_name && (
           <div className="rd-provenance">
             <span className="rd-provenance-icon">↪</span>
-            <span>Modified from original by <strong>{recipe.original_author_name}</strong></span>
+            <span>Modified from{' '}
+              {recipe.original_recipe_id ? (
+                <strong
+                  className="rd-provenance-link"
+                  onClick={() => navigate(`/recipes/${recipe.original_recipe_id}`)}
+                >
+                  {recipe.original_recipe_name || 'original recipe'}
+                </strong>
+              ) : (
+                <strong>{recipe.original_recipe_name || 'original recipe'}</strong>
+              )}
+              {' '}by {recipe.original_author_name}
+            </span>
           </div>
         )}
 

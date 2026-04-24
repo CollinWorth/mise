@@ -289,6 +289,7 @@
 }
 .rd-provenance-icon { font-size: 14px; color: var(--accent); }
 .rd-provenance strong { color: var(--text-secondary); }
+.rd-provenance-link { cursor: pointer; color: var(--accent) !important; text-decoration: underline; text-underline-offset: 2px; }
 
 /* ── Versions/Remixes ── */
 .rd-versions { margin: var(--space-3) 0; }

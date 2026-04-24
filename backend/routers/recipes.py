@@ -912,6 +912,7 @@ async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_c
     copy["avg_rating"] = 0.0
     copy["rating_count"] = 0
     copy["original_recipe_id"] = recipe_id
+    copy["original_recipe_name"] = source.get("recipe_name", "")
     copy["original_author_name"] = author_name
     copy["is_modified"] = False
     result = await recipes_collection.insert_one(copy)
@@ -986,6 +987,7 @@ async def update_recipe(request: Request, recipe_id: str, recipe: Recipe, user_i
     # Preserve provenance; mark as modified once edited
     if existing.get("original_recipe_id"):
         recipe_dict["original_recipe_id"] = existing["original_recipe_id"]
+        recipe_dict["original_recipe_name"] = existing.get("original_recipe_name", "")
         recipe_dict["original_author_name"] = existing.get("original_author_name")
         recipe_dict["is_modified"] = True
     result = await recipes_collection.find_one_and_replace(

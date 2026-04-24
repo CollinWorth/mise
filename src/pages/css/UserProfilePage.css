@@ -47,6 +47,55 @@
 .up-stat  { display: flex; flex-direction: column; }
 .up-stat-num   { font-size: var(--text-xl); font-weight: 800; color: var(--text-primary); line-height: 1; }
 .up-stat-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+.up-stat--btn {
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+  transition: opacity var(--transition);
+}
+.up-stat--btn:hover { opacity: 0.7; }
+.up-stat--btn:hover .up-stat-num { color: var(--accent); }
+
+/* ── Follow modal ── */
+.follow-modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center;
+}
+.follow-modal {
+  background: var(--surface); border-radius: var(--radius-xl);
+  width: min(420px, calc(100vw - 32px)); max-height: 70vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.follow-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border);
+}
+.follow-modal-title { font-size: var(--text-lg); font-weight: 700; margin: 0; }
+.follow-modal-close {
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  color: var(--text-tertiary); padding: var(--space-1); line-height: 1;
+}
+.follow-modal-close:hover { color: var(--text-primary); }
+.follow-modal-list { overflow-y: auto; padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
+.follow-modal-user {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-2); border-radius: var(--radius-md);
+  cursor: pointer; transition: background var(--transition);
+}
+.follow-modal-user:hover { background: var(--surface-raised); }
+.follow-modal-avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+}
+.follow-modal-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+.follow-modal-empty { font-size: var(--text-sm); color: var(--text-tertiary); padding: var(--space-6); text-align: center; }
+.follow-modal-skeleton {
+  height: 52px; border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-raised) 50%, var(--border) 75%);
+  background-size: 600px 100%; animation: up-shimmer 1.4s infinite linear;
+}
+@keyframes up-shimmer { from { background-position: -600px 0; } to { background-position: 600px 0; } }
 
 .up-empty { padding: var(--space-12) 0; color: var(--text-tertiary); font-size: var(--text-sm); }
 

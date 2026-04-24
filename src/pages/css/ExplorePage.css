@@ -285,6 +285,10 @@
 
 /* ── People section ── */
 .people-section { max-width: 560px; }
+.people-section-label {
+  font-size: var(--text-xs); font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: var(--space-3);
+}
 .people-list { display: flex; flex-direction: column; gap: var(--space-3); }
 .people-card {
   display: flex; align-items: center; gap: var(--space-4);

@@ -59,6 +59,9 @@ export default function DiscoverPage({ user }) {
   const [people, setPeople]             = useState([]);
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [followedIds, setFollowedIds]   = useState(new Set());
+  const [suggestedPeople, setSuggestedPeople] = useState([]);
+  const [suggestedLoading, setSuggestedLoading] = useState(false);
+  const [suggestedLoaded, setSuggestedLoaded]   = useState(false);
   const peopleTimer = useRef(null);
 
   const navigate = useNavigate();
@@ -88,6 +91,24 @@ export default function DiscoverPage({ user }) {
       })
       .catch(() => setExploreLoading(false));
   }, []);
+
+  // Load suggested people + following list when People tab first opens
+  useEffect(() => {
+    if (tab !== 'people' || suggestedLoaded) return;
+    setSuggestedLoading(true);
+    const loads = [apiFetch('/users/browse').then(r => r.ok ? r.json() : [])];
+    if (user) {
+      const uid = user.id || user._id;
+      loads.push(
+        apiFetch(`/users/${uid}/following`)
+          .then(r => r.ok ? r.json() : [])
+          .then(following => { setFollowedIds(new Set(following.map(f => f.id))); })
+      );
+    }
+    Promise.all(loads)
+      .then(([suggested]) => { setSuggestedPeople(suggested || []); setSuggestedLoading(false); setSuggestedLoaded(true); })
+      .catch(() => setSuggestedLoading(false));
+  }, [tab, user, suggestedLoaded]);
 
   // Debounced people search
   useEffect(() => {
@@ -349,11 +370,47 @@ export default function DiscoverPage({ user }) {
       {tab === 'people' && (
         <div className="people-section">
           {!peopleSearch.trim() ? (
-            <div className="ex-empty">
-              <span className="ex-empty-icon">👤</span>
-              <h3>Find cooks</h3>
-              <p>Search by name to find and follow other cooks.</p>
-            </div>
+            suggestedLoading ? (
+              <div className="people-list">
+                {[0,1,2,4,5].map(i => <div key={i} className="people-skeleton" />)}
+              </div>
+            ) : suggestedPeople.length === 0 ? (
+              <div className="ex-empty">
+                <span className="ex-empty-icon">👤</span>
+                <h3>Find cooks</h3>
+                <p>Search by name to find and follow other cooks.</p>
+              </div>
+            ) : (
+              <>
+                <p className="people-section-label">Popular cooks</p>
+                <div className="people-list">
+                  {suggestedPeople.map(person => {
+                    const pid = person._id || person.id;
+                    const isMe = user && (user.id === pid || user._id === pid);
+                    const following = followedIds.has(pid);
+                    return (
+                      <div key={pid} className="people-card" onClick={() => navigate(`/users/${pid}`)}>
+                        <div className="people-card-avatar">{person.name?.[0]?.toUpperCase() ?? '?'}</div>
+                        <div className="people-card-info">
+                          <span className="people-card-name">{person.name}</span>
+                          {person.recipe_count > 0 && (
+                            <span className="people-card-meta">{person.recipe_count} recipe{person.recipe_count !== 1 ? 's' : ''}</span>
+                          )}
+                        </div>
+                        {!isMe && user && (
+                          <button
+                            className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
+                            onClick={e => handleFollow(e, pid)}
+                          >
+                            {following ? 'Following' : 'Follow'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )
           ) : peopleLoading ? (
             <div className="people-list">
               {[0,1,2].map(i => <div key={i} className="people-skeleton" />)}

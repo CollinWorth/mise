@@ -104,9 +104,42 @@ async def search_users(q: str = ""):
     if not q.strip():
         return []
     cursor = db.find({"name": {"$regex": q.strip(), "$options": "i"}}).limit(20)
-    results = []
+    users = []
     async for u in cursor:
-        results.append({"id": str(u["_id"]), "name": u.get("name", "")})
+        users.append(u)
+    recipe_counts = await asyncio.gather(*[
+        recipes_collection.count_documents({"user_id": u["_id"], "is_public": True})
+        for u in users
+    ])
+    return [
+        {"id": str(u["_id"]), "name": u.get("name", ""), "recipe_count": count}
+        for u, count in zip(users, recipe_counts)
+    ]
+
+
+@router.get("/browse")
+async def browse_users():
+    pipeline = [
+        {"$lookup": {
+            "from": "recipes",
+            "let": {"uid": "$_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$and": [
+                    {"$eq": ["$user_id", "$$uid"]},
+                    {"$eq": ["$is_public", True]},
+                ]}}}
+            ],
+            "as": "public_recipes",
+        }},
+        {"$addFields": {"recipe_count": {"$size": "$public_recipes"}}},
+        {"$match": {"recipe_count": {"$gt": 0}}},
+        {"$sort": {"recipe_count": -1}},
+        {"$limit": 30},
+        {"$project": {"name": 1, "recipe_count": 1}},
+    ]
+    results = []
+    async for u in db.aggregate(pipeline):
+        results.append({"id": str(u["_id"]), "name": u.get("name", ""), "recipe_count": u["recipe_count"]})
     return results
 
 
