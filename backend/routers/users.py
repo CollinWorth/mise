@@ -125,46 +125,40 @@ async def search_users(q: str = ""):
 
 @router.get("/browse")
 async def browse_users():
-    pipeline = [
-        {"$lookup": {
-            "from": "recipes",
-            "let": {"uid": "$_id"},
-            "pipeline": [
-                {"$match": {"$expr": {"$and": [
-                    {"$eq": ["$user_id", "$$uid"]},
-                    {"$eq": ["$is_public", True]},
-                ]}}}
-            ],
-            "as": "public_recipes",
-        }},
-        {"$addFields": {"recipe_count": {"$size": "$public_recipes"}}},
-        {"$sort": {"recipe_count": -1}},
-        {"$limit": 30},
-        {"$project": {
-            "name": 1,
-            "recipe_count": 1,
-            "sample_image": {"$arrayElemAt": ["$public_recipes.image_url", 0]},
-        }},
-    ]
     users = []
-    async for u in db.aggregate(pipeline):
+    async for u in db.find({}, {"name": 1}).limit(100):
         users.append(u)
     if not users:
         return []
-    follower_counts = await asyncio.gather(*[
+    n = len(users)
+    results = await asyncio.gather(*[
+        recipes_collection.count_documents({"user_id": u["_id"], "is_public": True})
+        for u in users
+    ] + [
         follows_collection.count_documents({"following_id": str(u["_id"])})
         for u in users
+    ] + [
+        recipes_collection.find_one(
+            {"user_id": u["_id"], "is_public": True, "image_url": {"$exists": True, "$gt": ""}},
+            {"image_url": 1}
+        )
+        for u in users
     ])
-    return [
+    recipe_counts  = results[:n]
+    follower_counts = results[n:2*n]
+    sample_docs    = results[2*n:]
+    combined = [
         {
             "id": str(u["_id"]),
             "name": u.get("name", ""),
-            "recipe_count": u["recipe_count"],
+            "recipe_count": rc,
             "follower_count": fc,
-            "sample_image": u.get("sample_image") or None,
+            "sample_image": (sd or {}).get("image_url") or None,
         }
-        for u, fc in zip(users, follower_counts)
+        for u, rc, fc, sd in zip(users, recipe_counts, follower_counts, sample_docs)
     ]
+    combined.sort(key=lambda x: x["recipe_count"], reverse=True)
+    return combined[:30]
 
 
 @router.get("/{user_id}/followers")
