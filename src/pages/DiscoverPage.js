@@ -226,7 +226,7 @@ export default function DiscoverPage({ user }) {
     <div className="ex-page">
 
       {/* ── Header ─────────────────────────────────────── */}
-      <div className="ex-header">
+      <div className={`ex-header${tab === 'people' ? ' ex-header--people' : ''}`}>
         <div className="ex-header-top">
           {/* Mode toggle */}
           <div className="discover-mode-toggle">
@@ -252,7 +252,7 @@ export default function DiscoverPage({ user }) {
             </button>
           </div>
 
-          {/* Search — recipes (explore) or people */}
+          {/* Search — recipes (explore) only; people search lives inside its section */}
           {(!showingFeed && tab !== 'people') && (
             <div className="ex-search-wrap">
               <svg className="ex-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -265,22 +265,6 @@ export default function DiscoverPage({ user }) {
                 placeholder="Search recipes…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-          )}
-          {tab === 'people' && (
-            <div className="ex-search-wrap">
-              <svg className="ex-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input
-                className="ex-search"
-                type="search"
-                placeholder="Search people…"
-                value={peopleSearch}
-                onChange={e => setPeopleSearch(e.target.value)}
-                autoFocus
               />
             </div>
           )}
@@ -387,6 +371,24 @@ export default function DiscoverPage({ user }) {
       {/* ── People ─────────────────────────────────────── */}
       {tab === 'people' && (
         <div className="people-section">
+
+          {/* Search — lives here so it's flush with the list */}
+          <div className="people-search-wrap">
+            <svg className="people-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <input
+              className="people-search-input"
+              type="search"
+              placeholder="Search by name…"
+              value={peopleSearch}
+              onChange={e => setPeopleSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Results */}
           {!peopleSearch.trim() ? (
             suggestedLoading ? (
               <div className="people-list">
@@ -395,8 +397,8 @@ export default function DiscoverPage({ user }) {
             ) : suggestedPeople.length === 0 ? (
               <div className="ex-empty">
                 <span className="ex-empty-icon">👤</span>
-                <h3>Find cooks</h3>
-                <p>Search by name to find and follow other cooks.</p>
+                <h3>No cooks yet</h3>
+                <p>Be the first to share a public recipe.</p>
               </div>
             ) : (
               <>
@@ -417,7 +419,7 @@ export default function DiscoverPage({ user }) {
                           {meta && <span className="people-card-meta">{meta}</span>}
                         </div>
                         {person.sample_image && (
-                          <img className="people-card-thumb" src={person.sample_image} alt="" loading="lazy" onClick={e => e.stopPropagation()} />
+                          <img className="people-card-thumb" src={person.sample_image} alt="" loading="lazy" />
                         )}
                         {!isMe && user && (
                           <button
@@ -441,7 +443,7 @@ export default function DiscoverPage({ user }) {
             <div className="ex-empty">
               <span className="ex-empty-icon">🔍</span>
               <h3>No results</h3>
-              <p>No one found for "{peopleSearch}". Try a different name.</p>
+              <p>No one found for "{peopleSearch}".</p>
             </div>
           ) : (
             <>

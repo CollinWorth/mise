@@ -284,39 +284,67 @@
 .ex-empty p { font-size: var(--text-sm); color: var(--text-secondary); max-width: 340px; }
 
 /* ── People section ── */
+.ex-header--people { margin-bottom: 0; }
+
 .people-section { max-width: 560px; }
+
+.people-search-wrap {
+  position: relative;
+  margin-bottom: var(--space-5);
+}
+.people-search-icon {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary); pointer-events: none;
+}
+.people-search-input {
+  width: 100%;
+  padding: 0.7rem var(--space-4) 0.7rem 42px;
+  font-size: var(--text-base);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  box-sizing: border-box;
+}
+.people-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
 .people-section-label {
   font-size: var(--text-xs); font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: var(--space-3);
 }
-.people-list { display: flex; flex-direction: column; gap: var(--space-3); }
+.people-list { display: flex; flex-direction: column; gap: var(--space-2); }
 .people-card {
-  display: flex; align-items: center; gap: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-3);
   background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5);
-  cursor: pointer; transition: border-color var(--transition), box-shadow var(--transition);
+  border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4);
+  cursor: pointer; transition: border-color var(--transition), background var(--transition);
 }
-.people-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-xs); }
+.people-card:hover { border-color: var(--border-strong); background: var(--surface-raised); }
 .people-card-avatar {
-  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-  background: var(--accent); color: #fff;
+  width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+  color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: 700;
+  font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
 }
 .people-card-info { flex: 1; min-width: 0; }
-.people-card-name { display: block; font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
-.people-card-meta { display: block; font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 2px; }
+.people-card-name { display: block; font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); }
+.people-card-meta { display: block; font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 1px; }
 .people-card-thumb {
-  width: 44px; height: 44px; border-radius: var(--radius-md);
-  object-fit: cover; flex-shrink: 0; pointer-events: none;
-  opacity: 0.85;
+  width: 42px; height: 42px; border-radius: var(--radius-md);
+  object-fit: cover; flex-shrink: 0; opacity: 0.9;
 }
 .people-follow-btn {
   flex-shrink: 0;
   background: var(--text-primary); color: #fff;
   border: 1.5px solid var(--text-primary);
   font-size: var(--text-xs); font-weight: 700;
-  padding: 6px 16px; border-radius: 99px; cursor: pointer;
+  padding: 5px 14px; border-radius: 99px; cursor: pointer;
   transition: all var(--transition);
 }
 .people-follow-btn:hover { opacity: 0.85; }
@@ -326,7 +354,7 @@
 }
 .people-follow-btn--following:hover { border-color: var(--error); color: var(--error); }
 .people-skeleton {
-  height: 76px; border-radius: var(--radius-lg);
+  height: 68px; border-radius: var(--radius-lg);
   background: linear-gradient(90deg, var(--border) 25%, var(--surface-raised) 50%, var(--border) 75%);
   background-size: 600px 100%;
   animation: ex-shimmer 1.4s infinite linear;
