@@ -138,7 +138,6 @@ async def browse_users():
             "as": "public_recipes",
         }},
         {"$addFields": {"recipe_count": {"$size": "$public_recipes"}}},
-        {"$match": {"recipe_count": {"$gt": 0}}},
         {"$sort": {"recipe_count": -1}},
         {"$limit": 30},
         {"$project": {
