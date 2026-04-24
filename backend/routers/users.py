@@ -107,13 +107,19 @@ async def search_users(q: str = ""):
     users = []
     async for u in cursor:
         users.append(u)
-    recipe_counts = await asyncio.gather(*[
+    if not users:
+        return []
+    counts = await asyncio.gather(*[
         recipes_collection.count_documents({"user_id": u["_id"], "is_public": True})
         for u in users
+    ] + [
+        follows_collection.count_documents({"following_id": str(u["_id"])})
+        for u in users
     ])
+    n = len(users)
     return [
-        {"id": str(u["_id"]), "name": u.get("name", ""), "recipe_count": count}
-        for u, count in zip(users, recipe_counts)
+        {"id": str(u["_id"]), "name": u.get("name", ""), "recipe_count": counts[i], "follower_count": counts[n + i]}
+        for i, u in enumerate(users)
     ]
 
 
@@ -135,12 +141,31 @@ async def browse_users():
         {"$match": {"recipe_count": {"$gt": 0}}},
         {"$sort": {"recipe_count": -1}},
         {"$limit": 30},
-        {"$project": {"name": 1, "recipe_count": 1}},
+        {"$project": {
+            "name": 1,
+            "recipe_count": 1,
+            "sample_image": {"$first": "$public_recipes.image_url"},
+        }},
     ]
-    results = []
+    users = []
     async for u in db.aggregate(pipeline):
-        results.append({"id": str(u["_id"]), "name": u.get("name", ""), "recipe_count": u["recipe_count"]})
-    return results
+        users.append(u)
+    if not users:
+        return []
+    follower_counts = await asyncio.gather(*[
+        follows_collection.count_documents({"following_id": str(u["_id"])})
+        for u in users
+    ])
+    return [
+        {
+            "id": str(u["_id"]),
+            "name": u.get("name", ""),
+            "recipe_count": u["recipe_count"],
+            "follower_count": fc,
+            "sample_image": u.get("sample_image") or None,
+        }
+        for u, fc in zip(users, follower_counts)
+    ]
 
 
 @router.get("/{user_id}/followers")

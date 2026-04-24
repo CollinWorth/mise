@@ -306,6 +306,11 @@
 .people-card-info { flex: 1; min-width: 0; }
 .people-card-name { display: block; font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
 .people-card-meta { display: block; font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 2px; }
+.people-card-thumb {
+  width: 44px; height: 44px; border-radius: var(--radius-md);
+  object-fit: cover; flex-shrink: 0; pointer-events: none;
+  opacity: 0.85;
+}
 .people-follow-btn {
   flex-shrink: 0;
   background: var(--text-primary); color: #fff;

@@ -22,6 +22,24 @@ const STATIC_TABS = [
 function totalMinutes(r) { return (r.prep_time || 0) + (r.cook_time || 0); }
 function fmtTime(r) { const t = totalMinutes(r); return t > 0 ? `${t}m` : null; }
 
+const AVATAR_PALETTE = [
+  '#D4785A','#5B9BD5','#6BAF7A','#C4943A','#8A6FC4',
+  '#C45B8F','#4AABB8','#B06040','#5A9E6F','#7B6DB2',
+];
+function avatarColor(name) {
+  if (!name) return AVATAR_PALETTE[0];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+}
+
+function peopleMeta(person) {
+  const parts = [];
+  if (person.recipe_count > 0) parts.push(`${person.recipe_count} recipe${person.recipe_count !== 1 ? 's' : ''}`);
+  if (person.follower_count > 0) parts.push(`${person.follower_count} follower${person.follower_count !== 1 ? 's' : ''}`);
+  return parts.join(' · ');
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr);
@@ -372,7 +390,7 @@ export default function DiscoverPage({ user }) {
           {!peopleSearch.trim() ? (
             suggestedLoading ? (
               <div className="people-list">
-                {[0,1,2,4,5].map(i => <div key={i} className="people-skeleton" />)}
+                {[0,1,2,3,4].map(i => <div key={i} className="people-skeleton" />)}
               </div>
             ) : suggestedPeople.length === 0 ? (
               <div className="ex-empty">
@@ -388,15 +406,19 @@ export default function DiscoverPage({ user }) {
                     const pid = person._id || person.id;
                     const isMe = user && (user.id === pid || user._id === pid);
                     const following = followedIds.has(pid);
+                    const meta = peopleMeta(person);
                     return (
                       <div key={pid} className="people-card" onClick={() => navigate(`/users/${pid}`)}>
-                        <div className="people-card-avatar">{person.name?.[0]?.toUpperCase() ?? '?'}</div>
+                        <div className="people-card-avatar" style={{background: avatarColor(person.name)}}>
+                          {person.name?.[0]?.toUpperCase() ?? '?'}
+                        </div>
                         <div className="people-card-info">
                           <span className="people-card-name">{person.name}</span>
-                          {person.recipe_count > 0 && (
-                            <span className="people-card-meta">{person.recipe_count} recipe{person.recipe_count !== 1 ? 's' : ''}</span>
-                          )}
+                          {meta && <span className="people-card-meta">{meta}</span>}
                         </div>
+                        {person.sample_image && (
+                          <img className="people-card-thumb" src={person.sample_image} alt="" loading="lazy" onClick={e => e.stopPropagation()} />
+                        )}
                         {!isMe && user && (
                           <button
                             className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
@@ -422,32 +444,36 @@ export default function DiscoverPage({ user }) {
               <p>No one found for "{peopleSearch}". Try a different name.</p>
             </div>
           ) : (
-            <div className="people-list">
-              {people.map(person => {
-                const pid = person._id || person.id;
-                const isMe = user && (user.id === pid || user._id === pid);
-                const following = followedIds.has(pid);
-                return (
-                  <div key={pid} className="people-card" onClick={() => navigate(`/users/${pid}`)}>
-                    <div className="people-card-avatar">{person.name?.[0]?.toUpperCase() ?? '?'}</div>
-                    <div className="people-card-info">
-                      <span className="people-card-name">{person.name}</span>
-                      {person.recipe_count > 0 && (
-                        <span className="people-card-meta">{person.recipe_count} recipe{person.recipe_count !== 1 ? 's' : ''}</span>
+            <>
+              <p className="people-section-label">{people.length} cook{people.length !== 1 ? 's' : ''} found</p>
+              <div className="people-list">
+                {people.map(person => {
+                  const pid = person._id || person.id;
+                  const isMe = user && (user.id === pid || user._id === pid);
+                  const following = followedIds.has(pid);
+                  const meta = peopleMeta(person);
+                  return (
+                    <div key={pid} className="people-card" onClick={() => navigate(`/users/${pid}`)}>
+                      <div className="people-card-avatar" style={{background: avatarColor(person.name)}}>
+                        {person.name?.[0]?.toUpperCase() ?? '?'}
+                      </div>
+                      <div className="people-card-info">
+                        <span className="people-card-name">{person.name}</span>
+                        {meta && <span className="people-card-meta">{meta}</span>}
+                      </div>
+                      {!isMe && user && (
+                        <button
+                          className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
+                          onClick={e => handleFollow(e, pid)}
+                        >
+                          {following ? 'Following' : 'Follow'}
+                        </button>
                       )}
                     </div>
-                    {!isMe && user && (
-                      <button
-                        className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
-                        onClick={e => handleFollow(e, pid)}
-                      >
-                        {following ? 'Following' : 'Follow'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
