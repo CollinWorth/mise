@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch } from '../api';
 import './css/Recipes.css';
 
@@ -39,6 +39,20 @@ export default function Recipes({ user }) {
   const [sort, setSort] = useState('default');
   const [failedImages, setFailedImages] = useState(new Set());
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const goToRecipe = (id) => {
+    sessionStorage.setItem('recipes_scrollY', String(window.scrollY));
+    navigate(`/recipes/${id}`, { state: { from: location.pathname } });
+  };
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem('recipes_scrollY');
+    if (saved) {
+      sessionStorage.removeItem('recipes_scrollY');
+      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -171,7 +185,7 @@ export default function Recipes({ user }) {
                 <div
                   key={rid}
                   className={`recipe-card${hasImage ? '' : ' recipe-card--text'}`}
-                  onClick={() => navigate(`/recipes/${recipe._id || recipe.id}`)}
+                  onClick={() => goToRecipe(recipe._id || recipe.id)}
                 >
                   {hasImage ? (
                     <div className="recipe-card-img">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch } from '../api';
 import StarRating from '../components/StarRating';
 import './css/ExplorePage.css';
@@ -62,6 +62,21 @@ export default function DiscoverPage({ user }) {
   const peopleTimer = useRef(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const goToRecipe = (id) => {
+    sessionStorage.setItem('discover_scrollY', String(window.scrollY));
+    navigate(`/recipes/${id}`, { state: { from: location.pathname } });
+  };
+
+  // Restore scroll when returning from a recipe
+  useEffect(() => {
+    const saved = sessionStorage.getItem('discover_scrollY');
+    if (saved) {
+      sessionStorage.removeItem('discover_scrollY');
+      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
+    }
+  }, []);
 
   // Load explore recipes on mount
   useEffect(() => {
@@ -278,7 +293,7 @@ export default function DiscoverPage({ user }) {
                       </Link>
                       {recipe.category && <span className="feed-post-category">{recipe.category}</span>}
                     </div>
-                    <div className="feed-post-img" onClick={() => navigate(`/recipes/${id}`)}>
+                    <div className="feed-post-img" onClick={() => goToRecipe(id)}>
                       {recipe.image_url
                         ? <img src={recipe.image_url} alt={recipe.recipe_name} loading="lazy" />
                         : <div className="feed-post-placeholder" style={{background: cuisineBg(recipe.cuisine)}}>
@@ -292,7 +307,7 @@ export default function DiscoverPage({ user }) {
                       <div className="feed-action-btn feed-star-display">
                         <StarRating rating={recipe.avg_rating || 0} showCount count={recipe.rating_count || 0} size="sm" />
                       </div>
-                      <button className="feed-action-btn" onClick={() => navigate(`/recipes/${id}`)}>
+                      <button className="feed-action-btn" onClick={() => goToRecipe(id)}>
                         <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
                           <path d="M14 10C14 10.5523 13.5523 11 13 11H4.5L2 13.5V3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10Z"
                             stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
@@ -306,7 +321,7 @@ export default function DiscoverPage({ user }) {
                       </button>
                     </div>
                     <div className="feed-post-meta">
-                      <div className="feed-post-info" onClick={() => navigate(`/recipes/${id}`)}>
+                      <div className="feed-post-info" onClick={() => goToRecipe(id)}>
                         <span className="feed-post-title">{recipe.recipe_name}</span>
                         <span className="feed-post-details">
                           {recipe.cuisine && <>{recipe.cuisine}</>}
@@ -407,7 +422,7 @@ export default function DiscoverPage({ user }) {
                   key={id}
                   className={`ex-card${hasImage ? '' : ' ex-card--no-image'}`}
                   style={hasImage ? {} : { background: cuisineBg(recipe.cuisine) }}
-                  onClick={() => navigate(`/recipes/${id}`)}
+                  onClick={() => goToRecipe(id)}
                 >
                   {hasImage && (
                     <div className="ex-card-img">

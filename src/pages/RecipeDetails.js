@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../api';
 import { useToast } from '../contexts/ToastContext';
 import StarRating from '../components/StarRating';
@@ -28,6 +28,7 @@ function timeAgo(dateStr) {
 export default function RecipeDetails({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [recipe, setRecipe]     = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -43,6 +44,8 @@ export default function RecipeDetails({ user }) {
   const [avgRating, setAvgRating] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
   const [raters, setRaters] = useState([]);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
@@ -113,6 +116,16 @@ export default function RecipeDetails({ user }) {
     }
   };
 
+  const handleSaveRecipe = async () => {
+    if (!user) { navigate('/login'); return; }
+    setSaving(true);
+    try {
+      const r = await apiFetch(`/recipes/${id}/save`, { method: 'POST', body: '{}' });
+      if (r.ok) { setIsSaved(true); toast.success('Recipe saved to your collection'); }
+    } catch {}
+    setSaving(false);
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('Delete this recipe?')) return;
     const res = await apiFetch(`/recipes/${id}`, { method: 'DELETE' });
@@ -137,6 +150,8 @@ export default function RecipeDetails({ user }) {
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const isOwner = user && (user.id === recipe.user_id || user._id === recipe.user_id);
   const isPublic = recipe.is_public;
+  const fromPath = location.state?.from || '';
+  const backLabel = /discover|explore|feed/.test(fromPath) ? 'Discover' : 'Recipes';
 
   const baseServings = recipe.servings || 1;
   const scaleFactor  = servings ? servings / baseServings : 1;
@@ -181,7 +196,7 @@ export default function RecipeDetails({ user }) {
           )}
           {hasImg && <div className="rd-hero-overlay" />}
           <div className="rd-hero-content">
-            <button className="rd-back" onClick={() => navigate('/recipes')}>← Recipes</button>
+            <button className="rd-back" onClick={() => navigate(-1)}>← {backLabel}</button>
             <h1 className="rd-title">{recipe.recipe_name}</h1>
           <div className="rd-meta-row">
               {recipe.prep_time > 0 && <span className="rd-meta-pill">Prep {recipe.prep_time}m</span>}
@@ -280,12 +295,16 @@ export default function RecipeDetails({ user }) {
 
         {/* ── Actions ──────────────────────────────────────── */}
         <div className="rd-actions">
-          {steps.length > 0 && (
-            <button className="btn-primary" onClick={() => navigate(`/recipes/${id}/cook`)}>
-              Start Cooking
+          {!isOwner && (
+            <button
+              className={isSaved ? 'btn-ghost' : 'btn-primary'}
+              onClick={handleSaveRecipe}
+              disabled={saving || isSaved}
+            >
+              {isSaved ? '✓ Saved' : saving ? '…' : '+ Save Recipe'}
             </button>
           )}
-          {isPublic && (
+          {isOwner && isPublic && (
             <div className="rd-rating">
               <StarRating
                 rating={userRating || 0}
