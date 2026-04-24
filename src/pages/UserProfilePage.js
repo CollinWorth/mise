@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/UserProfilePage.css';
 import './css/Recipes.css';
 
@@ -131,7 +131,7 @@ export default function UserProfilePage({ user: currentUser }) {
             >
               <div className="recipe-card-img">
                 {recipe.image_url
-                  ? <img src={recipe.image_url} alt={recipe.recipe_name} />
+                  ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} />
                   : <div className="recipe-placeholder" style={{background: cuisinePastel(recipe.cuisine)}} />
                 }
                 <div className="recipe-card-overlay">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/ExplorePage.css';
 // Note: uses own card styles — intentionally different from Recipes page
 
@@ -184,7 +184,7 @@ export default function ExplorePage({ user }) {
                 {hasImage && (
                   <div className="ex-card-img">
                     <img
-                      src={recipe.image_url}
+                      src={imgUrl(recipe.image_url)}
                       alt={recipe.recipe_name}
                       loading="lazy"
                       onError={() => setFailedImages(prev => new Set(prev).add(id))}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
 import StarRating from '../components/StarRating';
 import './css/RecipeDetails.css';
@@ -188,8 +188,8 @@ export default function RecipeDetails({ user }) {
         <div className={`rd-hero${hasImg ? '' : ' rd-hero--noimage'}`}>
           {hasImg ? (
             <>
-              <img src={recipe.image_url} alt="" className="rd-hero-blur" aria-hidden="true" onError={() => setImgError(true)} />
-              <img src={recipe.image_url} alt={recipe.recipe_name} className="rd-hero-img" onError={() => setImgError(true)} />
+              <img src={imgUrl(recipe.image_url)} alt="" className="rd-hero-blur" aria-hidden="true" onError={() => setImgError(true)} />
+              <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} className="rd-hero-img" onError={() => setImgError(true)} />
             </>
           ) : (
             <div className="rd-hero-placeholder" style={{ background: cuisinePastel(recipe.cuisine) }} />

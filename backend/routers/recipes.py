@@ -932,13 +932,23 @@ async def get_recipe_versions(recipe_id: str):
     return await _attach_author_names(results)
 
 
+def _public_base_url(request: Request) -> str:
+    """Return the externally-visible base URL, preferring the BASE_URL env var."""
+    env = os.getenv("BASE_URL", "").rstrip("/")
+    if env:
+        return env
+    # Fall back to the request's own base URL (works for local dev)
+    return str(request.base_url).rstrip("/")
+
+
 async def _maybe_archive_image(url: str | None, request: Request) -> str | None:
     """Download an external image URL and store it locally; return the local URL."""
     if not url:
         return url
-    base_url = str(request.base_url).rstrip("/")
-    # Already a local URL — nothing to do
-    if url.startswith(base_url) or '/uploads/' in url or not url.startswith('http'):
+    if '/uploads/' in url or not url.startswith('http'):
+        return url
+    base_url = _public_base_url(request)
+    if url.startswith(base_url):
         return url
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/DayPlanner.css';
 import SearchBar from '../components/SearchBar.js';
 
@@ -119,7 +119,7 @@ function DayPlanner({ user, recipes, selectedDay, setSelectedDay, selectedWeek, 
             {dayRecipes.map((recipe, idx) => (
               <li key={idx} className="recipe-item">
                 {recipe.image_url && (
-                  <img src={recipe.image_url} alt={recipe.recipe_name} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} />
+                  <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} />
                 )}
                 <span className="recipe-name">{recipe.recipe_name}</span>
                 {recipe.cuisine && <span className="recipe-cuisine">{recipe.cuisine}</span>}
@@ -144,7 +144,7 @@ function DayPlanner({ user, recipes, selectedDay, setSelectedDay, selectedWeek, 
               onDragStart={(e) => handleDragStart(e, recipe)}
             >
               {recipe.image_url && (
-                <img src={recipe.image_url} alt={recipe.recipe_name} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />
+                <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />
               )}
               <span className="recipe-name">{recipe.recipe_name}</span>
               {recipe.cuisine && <span className="recipe-cuisine">{recipe.cuisine}</span>}

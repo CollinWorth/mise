@@ -1,5 +1,15 @@
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+export function imgUrl(url) {
+  if (!url) return url;
+  // Fix URLs that were stored with a wrong base (e.g. http://localhost:8000 in prod)
+  if (url.includes('/uploads/')) {
+    const path = url.substring(url.indexOf('/uploads/'));
+    return `${API}${path}`;
+  }
+  return url;
+}
+
 export function getToken() {
   return localStorage.getItem('mise_token');
 }

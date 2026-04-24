@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/Calendar.css';
 
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -224,7 +224,7 @@ export default function CalendarPage({ user }) {
                       {(() => { const mid = meal._id||meal.id; const mok = meal.image_url && !failedImgs.has(mid); return (
                       <div className="week-meal-img" style={!mok ? {background: cuisinePastel(meal.cuisine)} : {}}>
                         {mok
-                          ? <img src={meal.image_url} alt={meal.recipe_name} draggable={false} onError={() => setFailedImgs(p => new Set(p).add(mid))} />
+                          ? <img src={imgUrl(meal.image_url)} alt={meal.recipe_name} draggable={false} onError={() => setFailedImgs(p => new Set(p).add(mid))} />
                           : null}
                       </div>
                       ); })()}
@@ -318,7 +318,7 @@ export default function CalendarPage({ user }) {
                   {(() => { const rok = recipe.image_url && !failedImgs.has(rid); return (
                   <div className="sidebar-recipe-img" style={!rok ? {background: cuisinePastel(recipe.cuisine)} : {}}>
                     {rok
-                      ? <img src={recipe.image_url} alt={recipe.recipe_name} draggable={false} onError={() => setFailedImgs(p => new Set(p).add(rid))} />
+                      ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} draggable={false} onError={() => setFailedImgs(p => new Set(p).add(rid))} />
                       : null}
                   </div>
                   ); })()}

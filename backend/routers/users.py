@@ -143,7 +143,7 @@ async def browse_users():
         {"$project": {
             "name": 1,
             "recipe_count": 1,
-            "sample_image": {"$first": "$public_recipes.image_url"},
+            "sample_image": {"$arrayElemAt": ["$public_recipes.image_url", 0]},
         }},
     ]
     users = []

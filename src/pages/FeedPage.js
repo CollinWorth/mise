@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/FeedPage.css';
 
 const CUISINE_PASTELS = {
@@ -120,7 +120,7 @@ export default function FeedPage({ user }) {
                   {/* Image or text hero */}
                   <div className="feed-post-img" onClick={() => navigate(`/recipes/${id}`)}>
                     {recipe.image_url
-                      ? <img src={recipe.image_url} alt={recipe.recipe_name} loading="lazy" />
+                      ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy" />
                       : <div className="feed-post-placeholder" style={{background: cuisinePastel(recipe.cuisine)}}>
                           {recipe.category && <span className="feed-placeholder-pill">{recipe.category}</span>}
                           <span className="feed-post-placeholder-name">{recipe.recipe_name}</span>

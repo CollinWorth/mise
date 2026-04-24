@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/Recipes.css';
 
 const SORT_OPTIONS = [
@@ -190,7 +190,7 @@ export default function Recipes({ user }) {
                   {hasImage ? (
                     <div className="recipe-card-img">
                       <img
-                        src={recipe.image_url}
+                        src={imgUrl(recipe.image_url)}
                         alt={recipe.recipe_name}
                         onError={() => setFailedImages(prev => new Set(prev).add(rid))}
                       />

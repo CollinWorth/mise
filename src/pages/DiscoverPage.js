@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import StarRating from '../components/StarRating';
 import './css/ExplorePage.css';
 import './css/FeedPage.css';
@@ -318,7 +318,7 @@ export default function DiscoverPage({ user }) {
                     </div>
                     <div className="feed-post-img" onClick={() => goToRecipe(id)}>
                       {recipe.image_url
-                        ? <img src={recipe.image_url} alt={recipe.recipe_name} loading="lazy" />
+                        ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy" />
                         : <div className="feed-post-placeholder" style={{background: cuisineBg(recipe.cuisine)}}>
                             {recipe.category && <span className="feed-placeholder-pill">{recipe.category}</span>}
                             <span className="feed-post-placeholder-name">{recipe.recipe_name}</span>
@@ -419,7 +419,7 @@ export default function DiscoverPage({ user }) {
                           {meta && <span className="people-card-meta">{meta}</span>}
                         </div>
                         {person.sample_image && (
-                          <img className="people-card-thumb" src={person.sample_image} alt="" loading="lazy" />
+                          <img className="people-card-thumb" src={imgUrl(person.sample_image)} alt="" loading="lazy" />
                         )}
                         {!isMe && user && (
                           <button
@@ -511,7 +511,7 @@ export default function DiscoverPage({ user }) {
                 >
                   {hasImage && (
                     <div className="ex-card-img">
-                      <img src={recipe.image_url} alt={recipe.recipe_name} loading="lazy"
+                      <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
                         onError={() => setFailedImages(prev => new Set(prev).add(id))} />
                       {recipe.cuisine && <span className="ex-card-cuisine">{recipe.cuisine}</span>}
                     </div>

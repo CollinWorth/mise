@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import './css/Recipes.css';
 import './css/ProfilePage.css';
 
@@ -108,7 +108,7 @@ export default function ProfilePage({ user, onLogout }) {
             >
               <div className="recipe-card-img">
                 {recipe.image_url
-                  ? <img src={recipe.image_url} alt={recipe.recipe_name} />
+                  ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} />
                   : <div className="recipe-placeholder" style={{background:cuisinePastel(recipe.cuisine)}} />
                 }
                 <div className="recipe-card-overlay">
