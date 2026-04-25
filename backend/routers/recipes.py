@@ -284,7 +284,7 @@ async def get_feed(current_user_id: str = Depends(get_current_user_id), skip: in
         return []
     following_ids = [ObjectId(f["following_id"]) for f in following]
     cursor = recipes_collection.find(
-        {"user_id": {"$in": following_ids}, "is_public": True}
+        {"user_id": {"$in": following_ids}, "is_public": True, "is_modified": {"$ne": True}}
     ).sort("_id", -1).skip(skip).limit(limit)
     results = []
     async for r in cursor:
@@ -295,7 +295,7 @@ async def get_feed(current_user_id: str = Depends(get_current_user_id), skip: in
 
 @router.get("/explore")
 async def explore_recipes(skip: int = 0, limit: int = 100, user_id: str | None = Depends(get_optional_user_id)):
-    query: dict = {"is_public": True}
+    query: dict = {"is_public": True, "is_modified": {"$ne": True}}
     if user_id:
         query["user_id"] = {"$ne": ObjectId(user_id)}
     cursor = recipes_collection.find(query).skip(skip).limit(limit)
