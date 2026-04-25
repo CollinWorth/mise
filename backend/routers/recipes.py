@@ -896,11 +896,10 @@ async def like_recipe(recipe_id: str):
 
 
 @router.post("/{recipe_id}/save")
-async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_current_user_id)):
+async def save_recipe_to_collection(recipe_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
     source = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
     if not source:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    # Resolve original author name
     author_doc = await users_collection.find_one({"_id": source["user_id"]})
     author_name = author_doc.get("name", "Chef") if author_doc else "Chef"
     copy = {k: v for k, v in source.items()
@@ -915,6 +914,12 @@ async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_c
     copy["original_recipe_name"] = source.get("recipe_name", "")
     copy["original_author_name"] = author_name
     copy["is_modified"] = False
+    # Normalize localhost image URLs to the server's public base URL
+    img = copy.get("image_url")
+    if img:
+        m = re.match(r'https?://localhost(?::\d+)?(/uploads/.*)', img)
+        if m:
+            copy["image_url"] = f"{_public_base_url(request)}{m.group(1)}"
     result = await recipes_collection.insert_one(copy)
     return {"id": str(result.inserted_id), "message": "Saved to your recipes"}
 
@@ -945,6 +950,10 @@ async def _maybe_archive_image(url: str | None, request: Request) -> str | None:
     """Download an external image URL and store it locally; return the local URL."""
     if not url:
         return url
+    # Rebase any localhost uploads URL to the server's public URL
+    m = re.match(r'https?://localhost(?::\d+)?(/uploads/.*)', url)
+    if m:
+        return f"{_public_base_url(request)}{m.group(1)}"
     if '/uploads/' in url or not url.startswith('http'):
         return url
     base_url = _public_base_url(request)
