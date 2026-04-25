@@ -318,13 +318,11 @@ export default function RecipeDetails({ user }) {
           )}
           {isPublic && (
             <div className="rd-rating">
-              {user && !isOwner && (
-                <StarRating
-                  rating={userRating || 0}
-                  onChange={handleRate}
-                  size="lg"
-                />
-              )}
+              <StarRating
+                rating={isOwner ? avgRating : (userRating || 0)}
+                onChange={!isOwner && user ? handleRate : undefined}
+                size="lg"
+              />
               {ratingCount > 0 && (
                 <span className="rd-rating-avg">{avgRating.toFixed(1)} <span className="rd-rating-of">/ 3</span> ({ratingCount})</span>
               )}

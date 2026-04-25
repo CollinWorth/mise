@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
+import StarRating from '../components/StarRating';
 import './css/Recipes.css';
 import './css/ProfilePage.css';
 
@@ -118,6 +119,9 @@ export default function ProfilePage({ user, onLogout }) {
                     {totalTime(recipe) && <span className="recipe-overlay-time">{totalTime(recipe)}</span>}
                   </div>
                   <div className="recipe-card-title">{recipe.recipe_name}</div>
+                  <div className="recipe-card-rating">
+                    <StarRating rating={recipe.avg_rating || 0} showScore={recipe.avg_rating > 0} size="sm" />
+                  </div>
                 </div>
               </div>
             </div>
