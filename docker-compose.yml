@@ -1,15 +1,4 @@
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: mise-backend
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
-    restart: unless-stopped
-
   frontend:
     build:
       context: .
