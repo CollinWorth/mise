@@ -318,8 +318,8 @@ export default function RecipeDetails({ user }) {
           )}
           <div className="rd-rating">
             <StarRating
-              rating={isOwner ? avgRating : (userRating || 0)}
-              onChange={!isOwner && user ? handleRate : undefined}
+              rating={userRating || 0}
+              onChange={user ? handleRate : undefined}
               size="lg"
             />
             {ratingCount > 0 && (
