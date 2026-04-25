@@ -14,12 +14,12 @@ class RatingIn(BaseModel):
 
 
 async def _resolve_recipe_id(recipe_id: str) -> str:
-    """Redirect rating to the original if this is a remix."""
+    """Redirect rating to the original whenever this is a copy of another recipe."""
     doc = await recipes_collection.find_one(
         {"_id": ObjectId(recipe_id)},
-        {"is_modified": 1, "original_recipe_id": 1}
+        {"original_recipe_id": 1}
     )
-    if doc and doc.get("is_modified") and doc.get("original_recipe_id"):
+    if doc and doc.get("original_recipe_id"):
         return str(doc["original_recipe_id"])
     return recipe_id
 
