@@ -328,7 +328,7 @@ export default function DiscoverPage({ user }) {
                     </div>
                     <div className="feed-post-actions">
                       <div className="feed-action-btn feed-star-display">
-                        <StarRating rating={recipe.avg_rating || 0} showCount count={recipe.rating_count || 0} size="sm" />
+                        <StarRating rating={recipe.avg_rating || 0} showScore size="sm" />
                       </div>
                       <button className="feed-action-btn" onClick={() => goToRecipe(id)}>
                         <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
@@ -538,7 +538,7 @@ export default function DiscoverPage({ user }) {
                         <span className="ex-card-author-name">{recipe.author_name}</span>
                       </a>
                     )}
-                    <StarRating rating={recipe.avg_rating || 0} showCount count={recipe.rating_count || 0} size="sm" />
+                    <StarRating rating={recipe.avg_rating || 0} showScore size="sm" />
                     <button className={`ex-save-btn${saved ? ' ex-save-btn--saved' : ''}`} onClick={e => handleSave(e, id)} disabled={savingId === id}>
                       {savingId === id ? '…' : saved ? '✓ Saved' : '+ Save'}
                     </button>

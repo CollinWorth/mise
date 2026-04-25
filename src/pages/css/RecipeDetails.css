@@ -189,6 +189,9 @@
 .rd-rating-avg {
   font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary);
 }
+.rd-rating-of {
+  font-weight: 400; color: var(--text-tertiary);
+}
 
 /* ── Raters list ── */
 .rd-raters {

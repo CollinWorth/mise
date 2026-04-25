@@ -316,15 +316,17 @@ export default function RecipeDetails({ user }) {
               {isSaved ? '✓ Saved' : saving ? '…' : '+ Save Recipe'}
             </button>
           )}
-          {isOwner && isPublic && (
+          {isPublic && (
             <div className="rd-rating">
-              <StarRating
-                rating={userRating || 0}
-                onChange={user ? handleRate : undefined}
-                size="lg"
-              />
+              {user && !isOwner && (
+                <StarRating
+                  rating={userRating || 0}
+                  onChange={handleRate}
+                  size="lg"
+                />
+              )}
               {ratingCount > 0 && (
-                <span className="rd-rating-avg">{avgRating.toFixed(1)} ({ratingCount})</span>
+                <span className="rd-rating-avg">{avgRating.toFixed(1)} <span className="rd-rating-of">/ 3</span> ({ratingCount})</span>
               )}
             </div>
           )}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './css/StarRating.css';
 
-export default function StarRating({ rating = 0, onChange, size = 'md', showCount = false, count = 0 }) {
+export default function StarRating({ rating = 0, onChange, size = 'md', showCount = false, count = 0, showScore = false }) {
   const [hovered, setHovered] = useState(0);
   const interactive = !!onChange;
   const display = hovered || rating;
@@ -27,6 +27,7 @@ export default function StarRating({ rating = 0, onChange, size = 'md', showCoun
           </span>
         )
       )}
+      {showScore && rating > 0 && <span className="star-count">{rating.toFixed(1)}</span>}
       {showCount && count > 0 && <span className="star-count">({count})</span>}
     </div>
   );
