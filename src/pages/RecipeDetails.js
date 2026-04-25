@@ -316,18 +316,16 @@ export default function RecipeDetails({ user }) {
               {isSaved ? '✓ Saved' : saving ? '…' : '+ Save Recipe'}
             </button>
           )}
-          {isPublic && (
-            <div className="rd-rating">
-              <StarRating
-                rating={isOwner ? avgRating : (userRating || 0)}
-                onChange={!isOwner && user ? handleRate : undefined}
-                size="lg"
-              />
-              {ratingCount > 0 && (
-                <span className="rd-rating-avg">{avgRating.toFixed(1)} <span className="rd-rating-of">/ 3</span> ({ratingCount})</span>
-              )}
-            </div>
-          )}
+          <div className="rd-rating">
+            <StarRating
+              rating={isOwner ? avgRating : (userRating || 0)}
+              onChange={!isOwner && user ? handleRate : undefined}
+              size="lg"
+            />
+            {ratingCount > 0 && (
+              <span className="rd-rating-avg">{avgRating.toFixed(1)} <span className="rd-rating-of">/ 3</span> ({ratingCount})</span>
+            )}
+          </div>
           <button
             className="btn-ghost"
             onClick={() => {
