@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
+import StarRating from '../components/StarRating';
 import './css/Recipes.css';
 
 const SORT_OPTIONS = [
@@ -204,6 +205,11 @@ export default function Recipes({ user }) {
                         </div>
                         <div className="recipe-card-title">{recipe.recipe_name}</div>
                         {recipe.servings && <div className="recipe-card-sub">Serves {recipe.servings}</div>}
+                        {recipe.avg_rating > 0 && (
+                          <div className="recipe-card-rating">
+                            <StarRating rating={recipe.avg_rating} showScore size="sm" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -213,6 +219,11 @@ export default function Recipes({ user }) {
                         {[recipe.cuisine, totalTime(recipe), recipe.servings && `Serves ${recipe.servings}`]
                           .filter(Boolean).join(' · ')}
                       </div>
+                      {recipe.avg_rating > 0 && (
+                        <div className="recipe-card-rating">
+                          <StarRating rating={recipe.avg_rating} showScore size="sm" />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -305,6 +305,15 @@
   color: rgba(255,255,255,0.55);
   margin-top: 4px;
 }
+.recipe-card-rating {
+  margin-top: 6px;
+}
+.recipe-card-rating .star--filled { color: #f5c842; }
+.recipe-card-rating .star--empty  { color: rgba(255,255,255,0.35); }
+.recipe-card-rating .star-count   { color: rgba(255,255,255,0.7); }
+.recipe-card--text .recipe-card-rating .star--filled { color: var(--accent); }
+.recipe-card--text .recipe-card-rating .star--empty  { color: var(--text-tertiary); }
+.recipe-card--text .recipe-card-rating .star-count   { color: var(--text-secondary); }
 
 /* ── Loading skeletons ──────────────────────────────── */
 .recipes-loading {
