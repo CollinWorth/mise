@@ -26,6 +26,8 @@ function EditRecipe({ user }) {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tagInput, setTagInput] = useState('');
+  const [isRemix, setIsRemix] = useState(false);
+  const [originalName, setOriginalName] = useState('');
   const stepRefs = useRef([]);
 
   const autoResize = el => {
@@ -39,6 +41,8 @@ function EditRecipe({ user }) {
       .then(r => r.ok ? r.json() : null)
       .then(recipe => {
         if (!recipe) { navigate('/recipes'); return; }
+        setIsRemix(!!recipe.is_modified);
+        setOriginalName(recipe.original_recipe_name || 'the original recipe');
         setForm({
           recipe_name: recipe.recipe_name || '',
           instructions: recipe.instructions || '',
@@ -178,8 +182,8 @@ function EditRecipe({ user }) {
           </label>
           <div className="ar-toggle-row full-width">
             <div>
-              <span className="ar-toggle-label">Share publicly</span>
-              <span className="ar-toggle-sub">Show this recipe on Explore for others to discover</span>
+              <span className="ar-toggle-label">{isRemix ? 'Share as a version' : 'Share publicly'}</span>
+              <span className="ar-toggle-sub">{isRemix ? `Show this as a version of "${originalName}" on its recipe page` : 'Show this recipe on Explore for others to discover'}</span>
             </div>
             <button
               type="button"

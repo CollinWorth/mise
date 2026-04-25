@@ -110,7 +110,7 @@ async def search_users(q: str = ""):
     if not users:
         return []
     counts = await asyncio.gather(*[
-        recipes_collection.count_documents({"user_id": u["_id"], "is_public": True})
+        recipes_collection.count_documents({"user_id": u["_id"], "is_public": True, "is_modified": {"$ne": True}})
         for u in users
     ] + [
         follows_collection.count_documents({"following_id": str(u["_id"])})
@@ -132,14 +132,14 @@ async def browse_users():
         return []
     n = len(users)
     results = await asyncio.gather(*[
-        recipes_collection.count_documents({"user_id": u["_id"], "is_public": True})
+        recipes_collection.count_documents({"user_id": u["_id"], "is_public": True, "is_modified": {"$ne": True}})
         for u in users
     ] + [
         follows_collection.count_documents({"following_id": str(u["_id"])})
         for u in users
     ] + [
         recipes_collection.find_one(
-            {"user_id": u["_id"], "is_public": True, "image_url": {"$exists": True, "$gt": ""}},
+            {"user_id": u["_id"], "is_public": True, "is_modified": {"$ne": True}, "image_url": {"$exists": True, "$gt": ""}},
             {"image_url": 1}
         )
         for u in users
@@ -201,7 +201,7 @@ async def get_user_public_recipes(user_id: str):
         oid = ObjectId(user_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user_id")
-    cursor = recipes_collection.find({"user_id": oid, "is_public": True})
+    cursor = recipes_collection.find({"user_id": oid, "is_public": True, "is_modified": {"$ne": True}})
     results = []
     async for r in cursor:
         r["_id"] = str(r["_id"])
@@ -219,7 +219,7 @@ async def get_user(user_id: str):
     follower_count, following_count, recipe_count = await asyncio.gather(
         follows_collection.count_documents({"following_id": uid}),
         follows_collection.count_documents({"follower_id":  uid}),
-        recipes_collection.count_documents({"user_id": user["_id"], "is_public": True}),
+        recipes_collection.count_documents({"user_id": user["_id"], "is_public": True, "is_modified": {"$ne": True}}),
     )
     return {
         "id": uid,

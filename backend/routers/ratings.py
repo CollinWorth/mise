@@ -13,6 +13,17 @@ class RatingIn(BaseModel):
     rating: int = Field(..., ge=1, le=3)
 
 
+async def _resolve_recipe_id(recipe_id: str) -> str:
+    """Redirect rating to the original if this is a remix."""
+    doc = await recipes_collection.find_one(
+        {"_id": ObjectId(recipe_id)},
+        {"is_modified": 1, "original_recipe_id": 1}
+    )
+    if doc and doc.get("is_modified") and doc.get("original_recipe_id"):
+        return str(doc["original_recipe_id"])
+    return recipe_id
+
+
 async def _recalculate_recipe_rating(recipe_id: str):
     pipeline = [
         {"$match": {"recipe_id": recipe_id}},
@@ -34,6 +45,7 @@ async def _recalculate_recipe_rating(recipe_id: str):
 
 @router.post("/{recipe_id}")
 async def rate_recipe(recipe_id: str, body: RatingIn, user_id: str = Depends(get_current_user_id)):
+    recipe_id = await _resolve_recipe_id(recipe_id)
     recipe = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
@@ -52,6 +64,7 @@ async def rate_recipe(recipe_id: str, body: RatingIn, user_id: str = Depends(get
 
 @router.delete("/{recipe_id}")
 async def delete_rating(recipe_id: str, user_id: str = Depends(get_current_user_id)):
+    recipe_id = await _resolve_recipe_id(recipe_id)
     result = await ratings_collection.delete_one({"recipe_id": recipe_id, "user_id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Rating not found")
@@ -61,6 +74,7 @@ async def delete_rating(recipe_id: str, user_id: str = Depends(get_current_user_
 
 @router.get("/{recipe_id}")
 async def get_ratings(recipe_id: str, current_user_id: Optional[str] = Depends(get_optional_user_id)):
+    recipe_id = await _resolve_recipe_id(recipe_id)
     recipe = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")

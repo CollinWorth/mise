@@ -119,9 +119,10 @@ export default function RecipeDetails({ user }) {
   const handleSaveRecipe = async () => {
     if (!user) { navigate('/login'); return; }
     setSaving(true);
+    const saveId = recipe?.original_recipe_id || id;
     try {
-      const r = await apiFetch(`/recipes/${id}/save`, { method: 'POST', body: '{}' });
-      if (r.ok) { setIsSaved(true); toast.success('Recipe saved to your collection'); }
+      const r = await apiFetch(`/recipes/${saveId}/save`, { method: 'POST', body: '{}' });
+      if (r.ok) { setIsSaved(true); toast.success('Original recipe saved to your collection'); }
     } catch {}
     setSaving(false);
   };
@@ -222,21 +223,22 @@ export default function RecipeDetails({ user }) {
         )}
 
         {/* ── Provenance ───────────────────────────────────── */}
-        {recipe.is_modified && recipe.original_author_name && (
+        {recipe.is_modified && (
           <div className="rd-provenance">
             <span className="rd-provenance-icon">↪</span>
-            <span>Modified from{' '}
+            <span>A version of{' '}
               {recipe.original_recipe_id ? (
                 <strong
                   className="rd-provenance-link"
                   onClick={() => navigate(`/recipes/${recipe.original_recipe_id}`)}
                 >
-                  {recipe.original_recipe_name || 'original recipe'}
+                  {recipe.original_recipe_name || 'the original recipe'}
                 </strong>
               ) : (
-                <strong>{recipe.original_recipe_name || 'original recipe'}</strong>
+                <strong>{recipe.original_recipe_name || 'the original recipe'}</strong>
               )}
-              {' '}by {recipe.original_author_name}
+              {recipe.original_author_name ? ` by ${recipe.original_author_name}` : ''}
+              {' — '}ratings and saves go to the original
             </span>
           </div>
         )}
