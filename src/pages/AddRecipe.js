@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
+import ComboBox from '../components/ComboBox';
 import './css/AddRecipePage.css';
 
-const SUGGESTED_CATEGORIES = [
+const BASE_CATEGORIES = [
   'Soup','Stew','Chili','Salad','Bowl','Pasta','Rice','Curry','Stir-fry',
   'Tacos','Burger','Pizza','Sandwich','Wrap','Roast','Grilled','Seafood',
   'Breakfast','Brunch','Eggs','Pancakes','Oatmeal','Smoothie',
@@ -11,11 +12,21 @@ const SUGGESTED_CATEGORIES = [
   'Muffins','Pie','Dessert','Drink',
 ];
 
-const SUGGESTED_TAGS = [
+const BASE_TAGS = [
   'quick','easy','healthy','vegetarian','vegan','gluten-free',
   'dairy-free','spicy','meal prep','high-protein','low-carb',
   'keto','comfort food','weeknight','kid-friendly','budget-friendly',
 ];
+
+function mergeUnique(...arrays) {
+  const seen = new Set();
+  return arrays.flat().filter(v => {
+    const k = v.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
 
 const METHODS = [
   { id: 'url',    icon: '🔗', label: 'Import from URL',    sub: 'Paste a link from any recipe website or blog' },
@@ -44,20 +55,25 @@ export default function AddRecipe({ user }) {
   const [pasteText, setPasteText]     = useState('');
   const [importError, setImportError] = useState('');
   const [submitting, setSubmitting]   = useState(false);
-  const [tagInput, setTagInput]       = useState('');
-
-  const currentTags = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const addTag = tag => {
-    const t = tag.trim().toLowerCase();
-    if (!t || currentTags.map(x => x.toLowerCase()).includes(t)) return;
-    setForm(f => ({ ...f, tags: [...currentTags, t].join(', ') }));
-  };
-  const removeTag = tag => setForm(f => ({ ...f, tags: currentTags.filter(t => t !== tag).join(', ') }));
+  const [categorySuggestions, setCategorySuggestions] = useState(BASE_CATEGORIES);
+  const [tagSuggestions, setTagSuggestions]           = useState(BASE_TAGS);
 
   useEffect(() => {
     if (user && (user.id || user._id))
       setForm(f => ({ ...f, user_id: user.id || user._id }));
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    apiFetch(`/recipes/user/${user.id || user._id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(recipes => {
+        const cats = recipes.map(r => r.category).filter(Boolean);
+        const tags = recipes.flatMap(r => r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+        setCategorySuggestions(mergeUnique(cats, BASE_CATEGORIES));
+        setTagSuggestions(mergeUnique(tags, BASE_TAGS));
+      }).catch(() => {});
+  }, [user]); // eslint-disable-line
 
   const fillForm = (data) => {
     setForm(f => ({
@@ -240,43 +256,22 @@ export default function AddRecipe({ user }) {
                 </label>
                 <div className="ar-label ar-col-2">
                   Category
-                  <div className="ar-tag-suggestions">
-                    {SUGGESTED_CATEGORIES.map(cat => (
-                      <button key={cat} type="button"
-                        className={`ar-tag-suggest${form.category === cat ? ' ar-tag-suggest--active' : ''}`}
-                        onClick={() => setForm(f => ({ ...f, category: f.category === cat ? '' : cat }))}>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                  <input type="text" value={form.category} onChange={e => setForm({...form, category: e.target.value})} placeholder="Or type a custom category…" />
+                  <ComboBox
+                    value={form.category}
+                    onChange={v => setForm(f => ({ ...f, category: v }))}
+                    suggestions={categorySuggestions}
+                    placeholder="e.g. Pasta"
+                  />
                 </div>
                 <div className="ar-label ar-col-2">
                   Tags
-                  <div className="ar-tag-suggestions">
-                    {SUGGESTED_TAGS.filter(t => !currentTags.map(x => x.toLowerCase()).includes(t)).map(t => (
-                      <button key={t} type="button" className="ar-tag-suggest" onClick={() => addTag(t)}>+ {t}</button>
-                    ))}
-                  </div>
-                  <div className="ar-tag-input-row">
-                    {currentTags.map(t => (
-                      <span key={t} className="ar-tag-pill">
-                        {t}<button type="button" className="ar-tag-pill-remove" onClick={() => removeTag(t)}>×</button>
-                      </span>
-                    ))}
-                    <input
-                      type="text"
-                      className="ar-tag-text-input"
-                      placeholder={currentTags.length ? 'Add more…' : 'Type a tag…'}
-                      value={tagInput}
-                      onChange={e => setTagInput(e.target.value)}
-                      onKeyDown={e => {
-                        if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
-                          e.preventDefault(); addTag(tagInput); setTagInput('');
-                        }
-                      }}
-                    />
-                  </div>
+                  <ComboBox
+                    multi
+                    value={form.tags}
+                    onChange={v => setForm(f => ({ ...f, tags: v }))}
+                    suggestions={tagSuggestions}
+                    placeholder="Type a tag…"
+                  />
                 </div>
                 <label className="ar-label">
                   Prep (min)

@@ -5,11 +5,12 @@ import StarRating from '../components/StarRating';
 import './css/Recipes.css';
 
 const SORT_OPTIONS = [
-  { value: 'default',  label: 'Default' },
-  { value: 'az',       label: 'A → Z' },
-  { value: 'za',       label: 'Z → A' },
-  { value: 'quickest', label: 'Quickest' },
-  { value: 'fewest',   label: 'Fewest ingredients' },
+  { value: 'default',    label: 'Default' },
+  { value: 'top-rated',  label: '★ Top rated' },
+  { value: 'az',         label: 'A → Z' },
+  { value: 'za',         label: 'Z → A' },
+  { value: 'quickest',   label: 'Quickest' },
+  { value: 'fewest',     label: 'Fewest ingredients' },
 ];
 
 const CUISINE_BG = {
@@ -35,7 +36,8 @@ function totalTime(recipe) {
 export default function Recipes({ user }) {
   const [recipes, setRecipes] = useState([]);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
+  const [activeCuisine, setActiveCuisine] = useState('All');
+  const [activeTags, setActiveTags] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState('default');
   const [failedImages, setFailedImages] = useState(new Set());
@@ -81,6 +83,26 @@ export default function Recipes({ user }) {
 
   const cuisines = ['All', ...Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean)))];
 
+  // Collect all tags sorted by frequency
+  const allTags = (() => {
+    const freq = {};
+    recipes.forEach(r => {
+      (r.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean).forEach(t => {
+        freq[t] = (freq[t] || 0) + 1;
+      });
+    });
+    return Object.entries(freq).sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  })();
+
+  const toggleTag = tag => setActiveTags(prev => {
+    const next = new Set(prev);
+    if (next.has(tag)) next.delete(tag); else next.add(tag);
+    return next;
+  });
+
+  const clearFilters = () => { setActiveCuisine('All'); setActiveTags(new Set()); setSearch(''); };
+  const hasFilters = activeCuisine !== 'All' || activeTags.size > 0 || search;
+
   const filtered = (() => {
     const q = search.toLowerCase();
     let list = recipes.filter(r => {
@@ -89,10 +111,13 @@ export default function Recipes({ user }) {
         || (r.category || '').toLowerCase().includes(q)
         || (r.cuisine  || '').toLowerCase().includes(q)
         || (r.tags     || '').toLowerCase().includes(q);
-      const matchFilter = activeFilter === 'All' || r.cuisine === activeFilter;
-      return matchSearch && matchFilter;
+      const matchCuisine = activeCuisine === 'All' || r.cuisine === activeCuisine;
+      const recipeTags = new Set((r.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean));
+      const matchTags = activeTags.size === 0 || [...activeTags].every(t => recipeTags.has(t));
+      return matchSearch && matchCuisine && matchTags;
     });
-    if (sort === 'az') list = [...list].sort((a, b) => a.recipe_name.localeCompare(b.recipe_name));
+    if (sort === 'top-rated') list = [...list].sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
+    else if (sort === 'az') list = [...list].sort((a, b) => a.recipe_name.localeCompare(b.recipe_name));
     else if (sort === 'za') list = [...list].sort((a, b) => b.recipe_name.localeCompare(a.recipe_name));
     else if (sort === 'quickest') list = [...list].sort((a, b) => {
       const ta = (a.prep_time || 0) + (a.cook_time || 0);
@@ -117,7 +142,9 @@ export default function Recipes({ user }) {
         <div className="recipes-toolbar-left">
           <h1>Recipes</h1>
           {!loading && recipes.length > 0 && (
-            <span className="recipes-count">{recipes.length}</span>
+            <span className="recipes-count">
+              {hasFilters && filtered.length !== recipes.length ? `${filtered.length} / ` : ''}{recipes.length}
+            </span>
           )}
         </div>
         <div className="recipes-toolbar-right">
@@ -144,18 +171,32 @@ export default function Recipes({ user }) {
         </div>
       </div>
 
-      {/* Filter chips — cuisine only */}
-      {cuisines.length > 1 && (
-        <div className="recipes-filters">
-          {cuisines.map(f => (
-            <button
-              key={f}
-              className={`filter-chip${activeFilter === f ? ' filter-chip--active' : ''}`}
-              onClick={() => setActiveFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
+      {/* Filter bar */}
+      {(cuisines.length > 1 || allTags.length > 0) && (
+        <div className="recipes-filter-bar">
+          {cuisines.length > 1 && (
+            <div className="recipes-filter-group">
+              <span className="recipes-filter-label">Cuisine</span>
+              <div className="recipes-filter-chips">
+                {cuisines.map(c => (
+                  <button key={c} className={`filter-chip${activeCuisine === c ? ' filter-chip--active' : ''}`} onClick={() => setActiveCuisine(c)}>{c}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {allTags.length > 0 && (
+            <div className="recipes-filter-group">
+              <span className="recipes-filter-label">Tags</span>
+              <div className="recipes-filter-chips">
+                {allTags.map(t => (
+                  <button key={t} className={`filter-chip${activeTags.has(t) ? ' filter-chip--active' : ''}`} onClick={() => toggleTag(t)}>#{t}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {hasFilters && (
+            <button className="recipes-clear-filters" onClick={clearFilters}>Clear filters</button>
+          )}
         </div>
       )}
 
