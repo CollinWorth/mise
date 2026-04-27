@@ -135,7 +135,7 @@ export default function AddRecipe({ user }) {
       servings:  form.servings  ? Number(form.servings)  : undefined,
     };
     try {
-      const res = await apiFetch('/recipes', { method: 'POST', body: JSON.stringify(recipe) });
+      const res = await apiFetch('/recipes/', { method: 'POST', body: JSON.stringify(recipe) });
       if (res.ok) navigate('/recipes');
       else alert('Failed to save recipe');
     } catch (err) { alert('Error: ' + err.message); }
