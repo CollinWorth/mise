@@ -38,7 +38,7 @@ const METHODS = [
 function emptyForm(user) {
   return {
     recipe_name: '', prep_time: '', cook_time: '', servings: '',
-    cuisine: '', category: '', tags: '', image_url: '', is_public: false,
+    cuisine: '', category: '', tags: '', image_url: '', is_public: true,
     user_id: user?.id || user?._id || '',
   };
 }
@@ -145,6 +145,8 @@ export default function AddRecipe({ user }) {
   const updateIng  = (idx, field, val) => setIngredients(ingredients.map((x, i) => i === idx ? { ...x, [field]: val } : x));
   const updateStep = (idx, val)        => setSteps(steps.map((s, i) => i === idx ? val : s));
 
+  const goBack = () => { setMethod(null); setImported(false); setImportError(''); };
+
   // ── Method picker ────────────────────────────────────────────
   if (!method) {
     return (
@@ -171,16 +173,14 @@ export default function AddRecipe({ user }) {
 
   return (
     <div className="page ar-page">
-      <div className="ar-topbar">
-        <button className="ar-back" onClick={() => { setMethod(null); setImported(false); setImportError(''); }}>
-          ← Back
-        </button>
-        {!showImportPanel && (
-          <button className="btn-primary" form="recipe-form" type="submit" disabled={submitting}>
-            {submitting ? 'Saving…' : 'Save'}
-          </button>
-        )}
-      </div>
+      {showImportPanel ? (
+        <button className="ar-back" onClick={goBack}>← Back</button>
+      ) : (
+        <div className="page-header">
+          <h1>Add Recipe</h1>
+          <button className="ar-back" onClick={goBack}>← Back</button>
+        </div>
+      )}
 
       {/* ── Import panels ──────────────────────────────────── */}
       {showImportPanel && (
@@ -242,113 +242,108 @@ export default function AddRecipe({ user }) {
             </div>
           )}
 
-          <form id="recipe-form" className="ar-form" onSubmit={handleSubmit}>
-            <section className="ar-section">
-              <h3 className="ar-section-title">Details</h3>
-              <div className="ar-grid">
-                <label className="ar-label ar-col-2">
-                  Recipe name *
-                  <input type="text" value={form.recipe_name} onChange={e => setForm({...form, recipe_name: e.target.value})} required placeholder="e.g. Spaghetti Carbonara" />
-                </label>
-                <label className="ar-label">
-                  Cuisine
-                  <input type="text" value={form.cuisine} onChange={e => setForm({...form, cuisine: e.target.value})} placeholder="e.g. Italian" />
-                </label>
-                <div className="ar-label ar-col-2">
-                  Category
-                  <ComboBox
-                    value={form.category}
-                    onChange={v => setForm(f => ({ ...f, category: v }))}
-                    suggestions={categorySuggestions}
-                    placeholder="e.g. Pasta"
-                  />
-                </div>
-                <div className="ar-label ar-col-2">
-                  Tags
-                  <ComboBox
-                    multi
-                    value={form.tags}
-                    onChange={v => setForm(f => ({ ...f, tags: v }))}
-                    suggestions={tagSuggestions}
-                    placeholder="Type a tag…"
-                  />
-                </div>
-                <label className="ar-label">
-                  Prep (min)
-                  <input type="number" value={form.prep_time} onChange={e => setForm({...form, prep_time: e.target.value})} min="0" />
-                </label>
-                <label className="ar-label">
-                  Cook (min)
-                  <input type="number" value={form.cook_time} onChange={e => setForm({...form, cook_time: e.target.value})} min="0" />
-                </label>
-                <label className="ar-label">
-                  Servings
-                  <input type="number" value={form.servings} onChange={e => setForm({...form, servings: e.target.value})} min="1" />
-                </label>
-                <label className="ar-label ar-col-2">
-                  Image URL
-                  <input type="url" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://…" />
-                </label>
-                <div className="ar-label ar-col-2 ar-toggle-row">
-                  <div>
-                    <span className="ar-toggle-label">Share publicly</span>
-                    <span className="ar-toggle-sub">Show this recipe on Explore for others to discover</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={`ar-toggle${form.is_public ? ' ar-toggle--on' : ''}`}
-                    onClick={() => setForm(f => ({ ...f, is_public: !f.is_public }))}
-                    role="switch"
-                    aria-checked={form.is_public}
-                  />
-                </div>
+          <form className="add-recipe-form" onSubmit={handleSubmit}>
+            <div className="add-recipe-form-grid">
+              <label>
+                Recipe name *
+                <input type="text" value={form.recipe_name} onChange={e => setForm({...form, recipe_name: e.target.value})} required placeholder="e.g. Spaghetti Carbonara" />
+              </label>
+              <label>
+                Cuisine
+                <input type="text" value={form.cuisine} onChange={e => setForm({...form, cuisine: e.target.value})} placeholder="e.g. Italian" />
+              </label>
+              <div className="full-width">
+                Category
+                <ComboBox
+                  value={form.category}
+                  onChange={v => setForm(f => ({ ...f, category: v }))}
+                  suggestions={categorySuggestions}
+                  placeholder="e.g. Pasta"
+                />
               </div>
-            </section>
+              <div className="full-width">
+                Tags
+                <ComboBox
+                  multi
+                  value={form.tags}
+                  onChange={v => setForm(f => ({ ...f, tags: v }))}
+                  suggestions={tagSuggestions}
+                  placeholder="Type a tag…"
+                />
+              </div>
+              <label>
+                Prep (min)
+                <input type="number" value={form.prep_time} onChange={e => setForm({...form, prep_time: e.target.value})} min="0" />
+              </label>
+              <label>
+                Cook (min)
+                <input type="number" value={form.cook_time} onChange={e => setForm({...form, cook_time: e.target.value})} min="0" />
+              </label>
+              <label>
+                Servings
+                <input type="number" value={form.servings} onChange={e => setForm({...form, servings: e.target.value})} min="1" />
+              </label>
+              <label className="full-width">
+                Image URL
+                <input type="url" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://…" />
+              </label>
+              <div className="ar-toggle-row full-width">
+                <div>
+                  <span className="ar-toggle-label">Share publicly</span>
+                  <span className="ar-toggle-sub">Show this recipe on Explore for others to discover</span>
+                </div>
+                <button
+                  type="button"
+                  className={`ar-toggle${form.is_public ? ' ar-toggle--on' : ''}`}
+                  onClick={() => setForm(f => ({ ...f, is_public: !f.is_public }))}
+                  role="switch"
+                  aria-checked={form.is_public}
+                />
+              </div>
 
-            <section className="ar-section">
-              <h3 className="ar-section-title">Ingredients</h3>
-              <div className="ar-ingredients">
+              <label className="full-width">
+                Ingredients
                 {ingredients.map((ing, idx) => (
-                  <div key={idx} className="ar-ing-row">
-                    <input className="ar-ing-qty"  type="text" placeholder="Qty"  value={ing.quantity} onChange={e => updateIng(idx, 'quantity', e.target.value)} />
-                    <input className="ar-ing-unit" type="text" placeholder="Unit" value={ing.unit}     onChange={e => updateIng(idx, 'unit',     e.target.value)} />
-                    <input className="ar-ing-name" type="text" placeholder="Ingredient name" value={ing.name} onChange={e => updateIng(idx, 'name', e.target.value)} />
+                  <div key={idx} className="ingredient-row">
+                    <input type="text" placeholder="Name" value={ing.name} onChange={e => updateIng(idx, 'name', e.target.value)} />
+                    <input type="text" placeholder="Qty" value={ing.quantity} onChange={e => updateIng(idx, 'quantity', e.target.value)} />
+                    <input type="text" placeholder="Unit" value={ing.unit} onChange={e => updateIng(idx, 'unit', e.target.value)} />
                     {ingredients.length > 1 && (
-                      <button type="button" className="ar-remove" onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
+                      <button type="button" className="btn-remove-ingredient" onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
                     )}
                   </div>
                 ))}
-                <button type="button" className="ar-add-row" onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }])}>
+                <button type="button" className="btn-add-ingredient" onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }])}>
                   + Add ingredient
                 </button>
-              </div>
-            </section>
+              </label>
 
-            <section className="ar-section">
-              <h3 className="ar-section-title">Instructions</h3>
-              <div className="ar-steps">
-                {steps.map((step, idx) => (
-                  <div key={idx} className="ar-step-row">
-                    <span className="ar-step-num">{idx + 1}</span>
-                    <textarea
-                      className="ar-step-input"
-                      placeholder={`Step ${idx + 1}…`}
-                      value={step}
-                      rows={2}
-                      onChange={e => updateStep(idx, e.target.value)}
-                    />
-                    {steps.length > 1 && (
-                      <button type="button" className="ar-remove" onClick={() => setSteps(steps.filter((_, i) => i !== idx))}>✕</button>
-                    )}
-                  </div>
-                ))}
-                <button type="button" className="ar-add-row" onClick={() => setSteps([...steps, ''])}>
-                  + Add step
-                </button>
+              <div className="full-width">
+                Instructions
+                <div className="ar-steps">
+                  {steps.map((step, idx) => (
+                    <div key={idx} className="ar-step-row">
+                      <span className="ar-step-num">{idx + 1}</span>
+                      <textarea
+                        className="ar-step-input"
+                        placeholder={`Step ${idx + 1}…`}
+                        value={step}
+                        rows={2}
+                        onChange={e => updateStep(idx, e.target.value)}
+                      />
+                      {steps.length > 1 && (
+                        <button type="button" className="btn-remove-ingredient" onClick={() => setSteps(steps.filter((_, i) => i !== idx))}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" className="btn-add-ingredient" onClick={() => setSteps([...steps, ''])}>
+                    + Add step
+                  </button>
+                </div>
               </div>
-            </section>
+            </div>
 
-            <div className="ar-footer">
+            <div className="add-recipe-actions">
               <button type="submit" className="btn-primary" disabled={submitting}>
                 {submitting ? 'Saving…' : 'Save Recipe'}
               </button>

@@ -12,7 +12,8 @@
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: var(--space-6);
 }
-.ar-topbar .ar-back { margin-bottom: 0; }
+.ar-topbar .ar-back,
+.page-header .ar-back { margin-bottom: 0; }
 
 /* ── Method picker ── */
 .ar-heading {
