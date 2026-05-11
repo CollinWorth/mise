@@ -168,7 +168,7 @@ button {
 
 @media (max-width: 768px) {
   .page {
-    padding: var(--space-6) var(--space-4) calc(var(--space-8) + 72px);
+    padding: var(--space-5) var(--space-4) calc(var(--space-8) + 72px);
   }
   /* Bigger touch targets for primary actions */
   .btn-primary, .btn-ghost, .btn-danger {

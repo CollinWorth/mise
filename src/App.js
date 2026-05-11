@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './styles/global.css';
 import './App.css';
@@ -23,6 +23,11 @@ import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
   const [user, setUser] = useState(getStoredUser);
+
+  useEffect(() => {
+    const theme = localStorage.getItem('mise_theme') || 'light';
+    document.documentElement.dataset.theme = theme;
+  }, []);
 
   const handleLogin = (token, userData) => {
     setSession(token, userData);

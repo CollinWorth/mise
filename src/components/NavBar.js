@@ -35,6 +35,21 @@ const ProfileIcon = () => (
     <circle cx="12" cy="7" r="4"/>
   </svg>
 );
+const LoginIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+    <polyline points="10 17 15 12 10 7"/>
+    <line x1="15" y1="12" x2="3" y2="12"/>
+  </svg>
+);
+const RegisterIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="8.5" cy="7" r="4"/>
+    <line x1="20" y1="8" x2="20" y2="14"/>
+    <line x1="23" y1="11" x2="17" y2="11"/>
+  </svg>
+);
 
 function NavBar({ user, onLogout }) {
   const location = useLocation();
@@ -42,14 +57,8 @@ function NavBar({ user, onLogout }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
   const bottomProfileRef = useRef(null);
-  const [theme, setTheme] = useState(() => localStorage.getItem('mise_theme') || 'light');
 
   const isCookMode = /\/recipes\/[^/]+\/cook/.test(location.pathname);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('mise_theme', theme);
-  }, [theme]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -93,14 +102,6 @@ function NavBar({ user, onLogout }) {
                 <NavLink to="/register" current={location.pathname}>Register</NavLink>
               </>
             )}
-            <button
-              className="nav-theme-toggle"
-              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-              aria-label="Toggle dark mode"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? '☀' : '☾'}
-            </button>
             {user && (
               <>
                 <div className="nav-divider nav-divider--desktop" />
@@ -127,32 +128,39 @@ function NavBar({ user, onLogout }) {
         </div>
       </nav>
 
-      {user && (
-        <nav className="nav-bottom" aria-label="Main navigation">
-          <BottomTab to="/discover"     label="Discover" icon={<DiscoverIcon />} current={location.pathname} aliases={['/discover','/explore','/feed']} />
-          <BottomTab to="/recipes"      label="Recipes"  icon={<RecipesIcon />}  current={location.pathname} />
-          <BottomTab to="/calendar"     label="Planner"  icon={<PlannerIcon />}  current={location.pathname} />
-          <BottomTab to="/grocery-list" label="Grocery"  icon={<GroceryIcon />}  current={location.pathname} />
-          <div className="nav-bottom-profile-wrap" ref={bottomProfileRef}>
-            <button
-              className={`nav-bottom-tab${profileOpen ? ' nav-bottom-tab--active' : ''}`}
-              onClick={() => setProfileOpen(o => !o)}
-              aria-label="Profile menu"
-            >
-              <span className="nav-bottom-icon"><ProfileIcon /></span>
-              <span className="nav-bottom-label">Profile</span>
-            </button>
-            {profileOpen && (
-              <div className="nav-dropdown nav-dropdown--up">
-                <div className="nav-dropdown-name">{user.name}</div>
-                <Link to="/profile"  className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Profile</Link>
-                <Link to="/settings" className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Settings</Link>
-                <button className="nav-dropdown-item nav-dropdown-signout" onClick={handleLogout}>Sign out</button>
-              </div>
-            )}
-          </div>
-        </nav>
-      )}
+      <nav className="nav-bottom" aria-label="Main navigation">
+        <BottomTab to="/discover" label="Discover" icon={<DiscoverIcon />} current={location.pathname} aliases={['/discover','/explore','/feed']} />
+        {user ? (
+          <>
+            <BottomTab to="/recipes"      label="Recipes" icon={<RecipesIcon />} current={location.pathname} />
+            <BottomTab to="/calendar"     label="Planner" icon={<PlannerIcon />} current={location.pathname} />
+            <BottomTab to="/grocery-list" label="Grocery" icon={<GroceryIcon />} current={location.pathname} />
+            <div className="nav-bottom-profile-wrap" ref={bottomProfileRef}>
+              <button
+                className={`nav-bottom-tab${profileOpen ? ' nav-bottom-tab--active' : ''}`}
+                onClick={() => setProfileOpen(o => !o)}
+                aria-label="Profile menu"
+              >
+                <span className="nav-bottom-icon"><ProfileIcon /></span>
+                <span className="nav-bottom-label">Profile</span>
+              </button>
+              {profileOpen && (
+                <div className="nav-dropdown nav-dropdown--up">
+                  <div className="nav-dropdown-name">{user.name}</div>
+                  <Link to="/profile"  className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Profile</Link>
+                  <Link to="/settings" className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Settings</Link>
+                  <button className="nav-dropdown-item nav-dropdown-signout" onClick={handleLogout}>Sign out</button>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <BottomTab to="/login"    label="Login"   icon={<LoginIcon />}    current={location.pathname} />
+            <BottomTab to="/register" label="Sign Up" icon={<RegisterIcon />} current={location.pathname} />
+          </>
+        )}
+      </nav>
     </>
   );
 }

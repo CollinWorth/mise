@@ -10,6 +10,15 @@ export default function SettingsPage({ user, onLogout }) {
   const navigate = useNavigate();
   const toast = useToast();
 
+  const [theme, setTheme] = useState(() => localStorage.getItem('mise_theme') || 'light');
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('mise_theme', next);
+    document.documentElement.dataset.theme = next;
+  };
+
   const [name, setName]   = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
 
@@ -115,6 +124,20 @@ export default function SettingsPage({ user, onLogout }) {
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
       </div>
+
+      {/* ── Appearance ───────────────────────────────────── */}
+      <section className="settings-section">
+        <h2 className="settings-section-title">Appearance</h2>
+        <div className="settings-row">
+          <div className="settings-row-info">
+            <span className="settings-row-label">Theme</span>
+            <span className="settings-row-value">{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
+          </div>
+          <button type="button" className="settings-toggle-btn" onClick={toggleTheme}>
+            {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+          </button>
+        </div>
+      </section>
 
       {/* ── Planner ──────────────────────────────────────── */}
       <section className="settings-section">
