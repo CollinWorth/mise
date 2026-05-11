@@ -181,6 +181,12 @@ button {
   }
 }
 
+/* Disable transform-based hover effects on touch — they fire on tap and look like a zoom glitch */
+@media (hover: none) {
+  .card:hover { transform: none; }
+  .btn-primary:hover { transform: none; box-shadow: none; }
+}
+
 .page-header {
   display: flex;
   align-items: center;

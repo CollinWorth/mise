@@ -160,3 +160,7 @@
 .feed-empty-icon { font-size: 3.5rem; opacity: 0.3; }
 .feed-empty h3 { font-size: var(--text-xl); font-weight: 700; }
 .feed-empty p { font-size: var(--text-sm); color: var(--text-secondary); max-width: 300px; }
+
+@media (hover: none) {
+  .feed-post-img:hover img { transform: none; }
+}

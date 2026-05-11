@@ -57,6 +57,8 @@ export default function CalendarPage({ user }) {
   const [calYear, setCalYear]           = useState(today.getFullYear());
   const [calMonth, setCalMonth]         = useState(today.getMonth());
   const [failedImgs, setFailedImgs]     = useState(() => new Set());
+  const [pickerOpen, setPickerOpen]     = useState(false);
+  const closeSheet = () => { setPickerOpen(false); setSearchQuery(''); };
 
   const weekDays = Array.from({length:7}, (_,i) => addDays(weekStart,i));
 
@@ -236,6 +238,11 @@ export default function CalendarPage({ user }) {
                     <div className="week-col-empty">+</div>
                   )}
                 </div>
+                <button
+                  className="week-day-add-btn"
+                  onClick={e => { e.stopPropagation(); selectDay(day); setPickerOpen(true); }}
+                  aria-label={`Add meal to ${DAY_NAMES[day.getDay()]} ${day.getDate()}`}
+                >+</button>
               </div>
             );
           })}
@@ -335,6 +342,54 @@ export default function CalendarPage({ user }) {
           </div>
         </div>
 
+      </div>
+
+      {/* ── Mobile recipe picker sheet ───────────────────── */}
+      <div
+        className={`planner-sheet-backdrop${pickerOpen ? ' planner-sheet-backdrop--open' : ''}`}
+        onClick={closeSheet}
+      />
+      <div className={`planner-sheet${pickerOpen ? ' planner-sheet--open' : ''}`}>
+        <div className="planner-sheet-bar" onClick={closeSheet} />
+        <div className="planner-sheet-head">
+          <span className="planner-sheet-title">
+            Add to <strong>{sameDay(selectedDate, today) ? 'Today' : DAY_FULL[selectedDate.getDay()]}</strong>
+          </span>
+          <button className="planner-sheet-close" onClick={closeSheet}>✕</button>
+        </div>
+        <input
+          type="search"
+          className="sidebar-search planner-sheet-search"
+          placeholder="Search recipes…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+        <div className="sidebar-recipe-list planner-sheet-list">
+          {filtered.length === 0 && <p className="sidebar-empty">No recipes found.</p>}
+          {filtered.map((recipe, i) => {
+            const rid = recipe._id || recipe.id;
+            const alreadyAdded = (weekMeals[fmt(selectedDate)]||[]).some(m => (m._id||m.id) === rid);
+            return (
+              <button
+                key={i}
+                className={`sidebar-recipe${alreadyAdded ? ' sidebar-recipe--added' : ''}`}
+                onClick={() => !alreadyAdded && addRecipe(recipe)}
+                disabled={alreadyAdded || adding === rid}
+              >
+                {(() => { const rok = recipe.image_url && !failedImgs.has(rid); return (
+                <div className="sidebar-recipe-img" style={!rok ? {background: cuisinePastel(recipe.cuisine)} : {}}>
+                  {rok ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} draggable={false} onError={() => setFailedImgs(p => new Set(p).add(rid))} /> : null}
+                </div>
+                ); })()}
+                <div className="sidebar-recipe-info">
+                  <span className="sidebar-recipe-name">{recipe.recipe_name}</span>
+                  {recipe.cook_time > 0 && <span className="sidebar-recipe-time">{recipe.cook_time}m</span>}
+                </div>
+                <span className="sidebar-recipe-add">{alreadyAdded ? '✓' : adding === rid ? '…' : '+'}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -411,6 +411,10 @@
 }
 .sidebar-recipe--added .sidebar-recipe-add { color: var(--success); }
 
+/* ── Desktop-only elements ────────────────────────────── */
+.week-day-add-btn { display: none; }
+.planner-sheet, .planner-sheet-backdrop { display: none; }
+
 /* ── Responsive ───────────────────────────────────────── */
 @media (max-width: 860px) {
   .planner-layout { height: auto; }
@@ -427,12 +431,214 @@
   }
 }
 
-@media (max-width: 600px) {
-  .planner-layout { padding: var(--space-4) var(--space-3); }
-  .week-view { gap: 2px; padding: var(--space-2); }
-  .week-col { padding: var(--space-1); }
-  .week-col-dow { display: none; }
-  .week-col-date { font-size: var(--text-base); }
-  .week-meal-name { display: none; }
-  .week-meal-img { height: 34px; }
+@media (max-width: 768px) {
+  /* Layout */
+  .planner-layout {
+    padding: var(--space-3) var(--space-4) calc(var(--space-5) + 72px);
+    gap: var(--space-3);
+  }
+
+  /* Hide desktop mini-cal and sidebar — replaced by bottom sheet */
+  .planner-bottom { display: none; }
+
+  /* Bigger nav buttons */
+  .week-nav-btn { width: 44px; height: 44px; }
+  .week-today-btn { min-height: 44px; padding: var(--space-2) var(--space-5); }
+
+  /* ── Vertical day list ── */
+  .week-view {
+    flex-direction: column;
+    background: transparent;
+    border: none;
+    padding: 0;
+    gap: var(--space-2);
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .week-col {
+    flex: none;
+    min-height: auto;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    cursor: default;
+    overflow: visible;
+  }
+  .week-col:hover { background: var(--surface); }
+  .week-col--selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+  .week-col--today { background: var(--surface); }
+
+  /* Compact day label on the left */
+  .week-col-header {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    gap: 1px;
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .week-col-dow { display: block; font-size: 10px; }
+  .week-col-date { font-size: var(--text-lg); }
+  .week-col-today-dot { width: 4px; height: 4px; margin-top: 1px; }
+
+  /* Horizontal meals row */
+  .week-col-meals {
+    flex-direction: row;
+    flex: 1;
+    overflow-x: auto;
+    gap: var(--space-2);
+    scrollbar-width: none;
+    align-items: center;
+    min-width: 0;
+    min-height: 42px;
+  }
+  .week-col-meals::-webkit-scrollbar { display: none; }
+
+  .week-col-empty {
+    height: 36px;
+    width: 60px;
+    font-size: var(--text-lg);
+    flex-shrink: 0;
+    opacity: 0.35;
+  }
+
+  /* Compact horizontal meal chip */
+  .week-meal {
+    flex-direction: row;
+    flex-shrink: 0;
+    align-items: center;
+    width: auto;
+    max-width: 148px;
+    padding: var(--space-1) var(--space-2);
+    gap: var(--space-2);
+  }
+  .week-meal-img { width: 28px; height: 28px; flex-shrink: 0; }
+  .week-meal-name {
+    display: block;
+    font-size: 11px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: unset;
+    max-width: 80px;
+  }
+  .week-meal-remove {
+    position: static;
+    opacity: 1;
+    width: 18px; height: 18px;
+    font-size: 9px;
+    flex-shrink: 0;
+    box-shadow: none;
+  }
+
+  /* Per-day add button */
+  .week-day-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    font-size: var(--text-xl);
+    font-weight: 300;
+    cursor: pointer;
+    transition: all var(--transition);
+    touch-action: manipulation;
+  }
+  .week-day-add-btn:active,
+  .week-day-add-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  /* ── Bottom sheet ── */
+  .planner-sheet-backdrop {
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 150;
+    transition: opacity 0.25s;
+  }
+  .planner-sheet-backdrop--open { opacity: 1; pointer-events: auto; }
+
+  .planner-sheet {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-top: 1.5px solid var(--border);
+    z-index: 151;
+    max-height: 78vh;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom, 0px));
+  }
+  .planner-sheet--open { transform: translateY(0); }
+
+  .planner-sheet-bar {
+    width: 36px; height: 4px;
+    background: var(--border-strong);
+    border-radius: 99px;
+    margin: 12px auto 0;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .planner-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-5) 0;
+    flex-shrink: 0;
+  }
+
+  .planner-sheet-title {
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+  }
+
+  .planner-sheet-close {
+    background: none; border: none;
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    padding: var(--space-2);
+    min-height: unset;
+    touch-action: manipulation;
+  }
+
+  .planner-sheet-search {
+    margin: var(--space-2) var(--space-4);
+    width: calc(100% - var(--space-4) * 2);
+    box-sizing: border-box;
+    font-size: 16px;
+  }
+
+  .planner-sheet-list {
+    overflow-y: auto;
+    flex: 1;
+    display: flex !important;
+    flex-direction: column;
+    grid-template-columns: unset;
+    padding: 0 var(--space-4) var(--space-2);
+    gap: var(--space-2);
+  }
 }

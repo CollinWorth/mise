@@ -389,3 +389,7 @@
   .ex-grid { columns: 2; column-gap: var(--space-3); }
   .ex-card { margin-bottom: var(--space-3); }
 }
+
+@media (hover: none) {
+  .ex-card:hover .ex-card-img img { transform: none; }
+}

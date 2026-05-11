@@ -260,6 +260,8 @@
 .recipe-card-img img {
   width: 100%;
   height: auto;
+  max-height: 300px;
+  object-fit: cover;
   display: block;
   transition: transform 0.5s ease;
 }
@@ -421,9 +423,27 @@
   .recipe-featured-overlay { padding: var(--space-4) var(--space-5); }
   .recipe-grid { columns: 2; column-gap: var(--space-3); }
   .recipe-card { margin-bottom: var(--space-3); }
-  .filter-chip { padding: var(--space-2) var(--space-3); min-height: 36px; }
+  .filter-chip { padding: var(--space-2) var(--space-3); min-height: 36px; flex-shrink: 0; }
+  /* Single-row horizontally scrollable chips — no more wrapping into multiple rows */
+  .recipes-filter-bar { gap: var(--space-2); }
+  .recipes-filter-group { flex-wrap: nowrap; overflow: hidden; }
+  .recipes-filter-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .recipes-filter-chips::-webkit-scrollbar { display: none; }
+  .recipes-filter-label { display: none; }
 }
 @media (max-width: 420px) {
   .recipe-grid { columns: 1; }
   .recipe-featured { height: 200px; }
+}
+
+@media (hover: none) {
+  .recipe-card:hover .recipe-card-img img { transform: none; }
+  .recipe-featured:hover .recipe-featured-img img { transform: none; }
+  .recipe-card--text:hover { transform: none; box-shadow: none; }
 }
