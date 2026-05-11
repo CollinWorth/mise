@@ -50,11 +50,13 @@ export default function RecipeDetails({ user }) {
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
   useEffect(() => {
+    const uid = user?.id || user?._id;
     Promise.all([
       apiFetch(`/recipes/${id}`).then(r => r.ok ? r.json() : null),
       apiFetch(`/comments/${id}`).then(r => r.ok ? r.json() : []),
       apiFetch(`/ratings/${id}`).then(r => r.ok ? r.json() : null),
-    ]).then(([data, cmts, ratingData]) => {
+      uid ? apiFetch(`/recipes/user/${uid}`).then(r => r.ok ? r.json() : []) : Promise.resolve([]),
+    ]).then(([data, cmts, ratingData, userRecipes]) => {
       setRecipe(data);
       if (data?.servings) setServings(data.servings);
       setComments(cmts || []);
@@ -64,12 +66,14 @@ export default function RecipeDetails({ user }) {
         setRatingCount(ratingData.rating_count);
         setRaters(ratingData.raters || []);
       }
+      const resolvedId = data?.original_recipe_id || id;
+      setIsSaved(userRecipes.some(r => r.original_recipe_id === resolvedId));
       setLoading(false);
       if (data?.is_public) {
         apiFetch(`/recipes/${id}/versions`).then(r => r.ok ? r.json() : []).then(setVersions).catch(() => {});
       }
     }).catch(() => setLoading(false));
-  }, [id]);
+  }, [id, user]);
 
   const submitComment = async (e) => {
     e.preventDefault();
@@ -223,20 +227,16 @@ export default function RecipeDetails({ user }) {
         )}
 
         {/* ── Provenance ───────────────────────────────────── */}
-        {recipe.is_modified && (
+        {recipe.original_recipe_id && (
           <div className="rd-provenance">
             <span className="rd-provenance-icon">↪</span>
-            <span>A version of{' '}
-              {recipe.original_recipe_id ? (
-                <strong
-                  className="rd-provenance-link"
-                  onClick={() => navigate(`/recipes/${recipe.original_recipe_id}`)}
-                >
-                  {recipe.original_recipe_name || 'the original recipe'}
-                </strong>
-              ) : (
-                <strong>{recipe.original_recipe_name || 'the original recipe'}</strong>
-              )}
+            <span>{recipe.is_modified ? 'A version of' : 'Saved from'}{' '}
+              <strong
+                className="rd-provenance-link"
+                onClick={() => navigate(`/recipes/${recipe.original_recipe_id}`)}
+              >
+                {recipe.original_recipe_name || 'the original recipe'}
+              </strong>
               {recipe.original_author_name ? ` by ${recipe.original_author_name}` : ''}
               {' — '}ratings and saves go to the original
             </span>

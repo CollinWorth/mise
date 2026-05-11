@@ -2,13 +2,49 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './css/NavBar.css';
 
+const DiscoverIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+  </svg>
+);
+const RecipesIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+const PlannerIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8" y1="2" x2="8" y2="6"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+const GroceryIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="21" r="1"/>
+    <circle cx="20" cy="21" r="1"/>
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+  </svg>
+);
+const ProfileIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
 function NavBar({ user, onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
-
+  const bottomProfileRef = useRef(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('mise_theme') || 'light');
+
+  const isCookMode = /\/recipes\/[^/]+\/cook/.test(location.pathname);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -17,12 +53,16 @@ function NavBar({ user, onLogout }) {
 
   useEffect(() => {
     const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setProfileOpen(false);
-      }
+      const inDesktop = profileRef.current?.contains(e.target);
+      const inBottom = bottomProfileRef.current?.contains(e.target);
+      if (!inDesktop && !inBottom) setProfileOpen(false);
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -31,74 +71,107 @@ function NavBar({ user, onLogout }) {
     setProfileOpen(false);
   };
 
+  if (isCookMode) return null;
+
   return (
-    <nav className="nav">
-      <div className="nav-inner">
-        <Link to="/" className="nav-logo">mise</Link>
-        <div className="nav-links">
-          <NavLink to="/discover" current={location.pathname}>Discover</NavLink>
-          {user && <NavLink to="/recipes"      current={location.pathname}>Recipes</NavLink>}
-          {user && <NavLink to="/calendar"     current={location.pathname}>Planner</NavLink>}
-          {user && <NavLink to="/grocery-list" current={location.pathname}>Grocery</NavLink>}
-          {!user && <NavLink to="/login"    current={location.pathname}>Login</NavLink>}
-          {!user && <NavLink to="/register" current={location.pathname}>Register</NavLink>}
-          <button
-            className="nav-theme-toggle"
-            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            aria-label="Toggle dark mode"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? '☀' : '☾'}
-          </button>
-          {user && (
-            <>
-              <div className="nav-divider" />
-              <div className="nav-profile-wrap" ref={profileRef}>
-                <button
-                  className={`nav-avatar${profileOpen ? ' nav-avatar--open' : ''}`}
-                  onClick={() => setProfileOpen(o => !o)}
-                  aria-label="Profile menu"
-                >
-                  {user.name?.[0]?.toUpperCase() ?? '?'}
-                </button>
-                {profileOpen && (
-                  <div className="nav-dropdown">
-                    <div className="nav-dropdown-name">{user.name}</div>
-                    <Link
-                      to="/profile"
-                      className="nav-dropdown-item"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      Profile
-                    </Link>
-                    <Link
-                      to="/settings"
-                      className="nav-dropdown-item"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      Settings
-                    </Link>
-                    <button className="nav-dropdown-item nav-dropdown-signout" onClick={handleLogout}>
-                      Sign out
-                    </button>
-                  </div>
-                )}
+    <>
+      <nav className="nav">
+        <div className="nav-inner">
+          <Link to="/" className="nav-logo">mise</Link>
+          <div className="nav-links">
+            {user ? (
+              <div className="nav-main-links">
+                <NavLink to="/discover"     current={location.pathname} aliases={['/discover','/explore','/feed']}>Discover</NavLink>
+                <NavLink to="/recipes"      current={location.pathname}>Recipes</NavLink>
+                <NavLink to="/calendar"     current={location.pathname}>Planner</NavLink>
+                <NavLink to="/grocery-list" current={location.pathname}>Grocery</NavLink>
               </div>
-            </>
-          )}
+            ) : (
+              <>
+                <NavLink to="/discover" current={location.pathname} aliases={['/discover','/explore','/feed']}>Discover</NavLink>
+                <NavLink to="/login"    current={location.pathname}>Login</NavLink>
+                <NavLink to="/register" current={location.pathname}>Register</NavLink>
+              </>
+            )}
+            <button
+              className="nav-theme-toggle"
+              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle dark mode"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? '☀' : '☾'}
+            </button>
+            {user && (
+              <>
+                <div className="nav-divider nav-divider--desktop" />
+                <div className="nav-profile-wrap nav-profile-wrap--desktop" ref={profileRef}>
+                  <button
+                    className={`nav-avatar${profileOpen ? ' nav-avatar--open' : ''}`}
+                    onClick={() => setProfileOpen(o => !o)}
+                    aria-label="Profile menu"
+                  >
+                    {user.name?.[0]?.toUpperCase() ?? '?'}
+                  </button>
+                  {profileOpen && (
+                    <div className="nav-dropdown">
+                      <div className="nav-dropdown-name">{user.name}</div>
+                      <Link to="/profile"  className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Profile</Link>
+                      <Link to="/settings" className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Settings</Link>
+                      <button className="nav-dropdown-item nav-dropdown-signout" onClick={handleLogout}>Sign out</button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {user && (
+        <nav className="nav-bottom" aria-label="Main navigation">
+          <BottomTab to="/discover"     label="Discover" icon={<DiscoverIcon />} current={location.pathname} aliases={['/discover','/explore','/feed']} />
+          <BottomTab to="/recipes"      label="Recipes"  icon={<RecipesIcon />}  current={location.pathname} />
+          <BottomTab to="/calendar"     label="Planner"  icon={<PlannerIcon />}  current={location.pathname} />
+          <BottomTab to="/grocery-list" label="Grocery"  icon={<GroceryIcon />}  current={location.pathname} />
+          <div className="nav-bottom-profile-wrap" ref={bottomProfileRef}>
+            <button
+              className={`nav-bottom-tab${profileOpen ? ' nav-bottom-tab--active' : ''}`}
+              onClick={() => setProfileOpen(o => !o)}
+              aria-label="Profile menu"
+            >
+              <span className="nav-bottom-icon"><ProfileIcon /></span>
+              <span className="nav-bottom-label">Profile</span>
+            </button>
+            {profileOpen && (
+              <div className="nav-dropdown nav-dropdown--up">
+                <div className="nav-dropdown-name">{user.name}</div>
+                <Link to="/profile"  className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Profile</Link>
+                <Link to="/settings" className="nav-dropdown-item" onClick={() => setProfileOpen(false)}>Settings</Link>
+                <button className="nav-dropdown-item nav-dropdown-signout" onClick={handleLogout}>Sign out</button>
+              </div>
+            )}
+          </div>
+        </nav>
+      )}
+    </>
   );
 }
 
-const DISCOVER_ALIASES = ['/discover', '/explore', '/feed'];
-function NavLink({ to, current, children }) {
-  const isDiscover = to === '/discover' && DISCOVER_ALIASES.includes(current);
-  const active = isDiscover || current === to || (to !== '/' && current.startsWith(to));
+function NavLink({ to, current, children, aliases = [] }) {
+  const active = aliases.includes(current) || current === to || (to !== '/' && current.startsWith(to));
   return (
     <Link to={to} className={`nav-link${active ? ' nav-link--active' : ''}`}>
       {children}
+    </Link>
+  );
+}
+
+function BottomTab({ to, label, icon, current, aliases = [] }) {
+  const active = aliases.includes(current) || current === to || (to !== '/' && current.startsWith(to));
+  return (
+    <Link to={to} className={`nav-bottom-tab${active ? ' nav-bottom-tab--active' : ''}`}>
+      <span className="nav-bottom-icon">{icon}</span>
+      <span className="nav-bottom-label">{label}</span>
     </Link>
   );
 }

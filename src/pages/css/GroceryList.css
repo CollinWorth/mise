@@ -523,5 +523,24 @@
 
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
-  .grocery-page { padding: var(--space-6) var(--space-4) var(--space-12); }
+  .grocery-page { padding: var(--space-6) var(--space-4) calc(var(--space-8) + 72px); }
+  .grocery-action-btn { min-height: 44px; padding: var(--space-2) var(--space-4); }
+  .mp-stepper-btn { width: 36px; height: 36px; }
+  .mp-nav-btn { width: 36px; height: 36px; }
+  .grocery-checkbox { width: 28px; height: 28px; min-width: 28px; }
+  .quick-add-chip { padding: 8px 14px; min-height: 36px; }
+  .grocery-add-input { min-height: 44px; font-size: 16px; }
+}
+
+/* On touch devices: make hover-only elements always visible */
+@media (hover: none) {
+  .grocery-cat-btn {
+    opacity: 0.45;
+  }
+  .grocery-remove {
+    color: var(--text-tertiary);
+    opacity: 0.7;
+  }
+  .grocery-item:hover .grocery-cat-btn { opacity: 0.45; }
+  .grocery-item:hover .grocery-remove { color: var(--text-tertiary); }
 }

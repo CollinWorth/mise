@@ -129,7 +129,7 @@
   gap: var(--space-2);
 }
 .rd-servings-btn {
-  width: 28px; height: 28px;
+  width: 36px; height: 36px;
   padding: 0;
   background: var(--bg);
   border: 1.5px solid var(--border);
@@ -139,6 +139,7 @@
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: all var(--transition);
+  touch-action: manipulation;
 }
 .rd-servings-btn:hover { border-color: var(--accent); color: var(--accent); }
 .rd-servings-label {
@@ -277,12 +278,15 @@
 .rd-comment-text   { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.5; margin: 0; }
 .rd-comment-delete {
   background: none; border: none; color: var(--text-tertiary);
-  font-size: 11px; cursor: pointer; padding: 2px 4px;
+  font-size: 11px; cursor: pointer; padding: 8px;
   border-radius: 4px; opacity: 0; transition: all var(--transition);
-  flex-shrink: 0; line-height: 1;
+  flex-shrink: 0; line-height: 1; touch-action: manipulation;
 }
 .rd-comment:hover .rd-comment-delete { opacity: 1; }
 .rd-comment-delete:hover { color: var(--error); background: #FFF5F5; }
+@media (hover: none) {
+  .rd-comment-delete { opacity: 0.6; }
+}
 
 /* ── Provenance ── */
 .rd-provenance {
@@ -331,4 +335,10 @@
 @media (max-width: 700px) {
   .rd-content { grid-template-columns: 1fr; }
   .rd-hero-content { padding: var(--space-5) var(--space-5) var(--space-6); }
+  .rd-body { padding-top: var(--space-4); padding-bottom: calc(var(--space-10) + 72px); }
+  .rd-hero { height: clamp(200px, 52vw, 280px); }
+  .rd-back { padding: var(--space-2) var(--space-4); min-height: 40px; }
+  .rd-actions { flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-6); }
+  .rd-comment-form { gap: var(--space-2); }
+  .rd-comment-submit { padding: var(--space-2) var(--space-3); min-height: 40px; }
 }

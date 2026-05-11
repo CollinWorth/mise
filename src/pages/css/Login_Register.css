@@ -182,11 +182,12 @@
   .auth-page {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+    min-height: calc(100vh - 56px);
   }
 
   .auth-panel-left {
-    padding: var(--space-8) var(--space-6);
-    gap: var(--space-5);
+    padding: var(--space-5) var(--space-6);
+    gap: var(--space-4);
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
@@ -203,7 +204,10 @@
   .auth-panel-right {
     border-left: none;
     border-top: 1px solid var(--border);
-    padding: var(--space-8) var(--space-5);
+    padding: var(--space-6) var(--space-5) var(--space-8);
     align-items: flex-start;
   }
+
+  .auth-submit { min-height: 48px; font-size: var(--text-base); }
+  .auth-form input { min-height: 48px; font-size: 16px; }
 }

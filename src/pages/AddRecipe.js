@@ -136,8 +136,10 @@ export default function AddRecipe({ user }) {
     };
     try {
       const res = await apiFetch('/recipes/', { method: 'POST', body: JSON.stringify(recipe) });
-      if (res.ok) navigate('/recipes');
-      else alert('Failed to save recipe');
+      if (res.ok) {
+        const data = await res.json();
+        navigate(data.id ? `/recipes/${data.id}` : '/recipes');
+      } else alert('Failed to save recipe');
     } catch (err) { alert('Error: ' + err.message); }
     setSubmitting(false);
   };

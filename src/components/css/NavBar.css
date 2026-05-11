@@ -99,14 +99,106 @@
   background: transparent;
   border: none;
   color: var(--nav-text-muted);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
-  padding: 4px 6px;
+  padding: 0;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: color var(--transition), background var(--transition);
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
 }
 .nav-theme-toggle:hover { color: var(--nav-text); background: rgba(255,255,255,0.07); }
+
+/* ── Desktop-only elements ─────────────────────────── */
+.nav-main-links { display: flex; align-items: center; gap: var(--space-1); }
+
+/* ── Bottom nav (mobile) ───────────────────────────── */
+.nav-bottom {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Hide main nav links from top bar — they move to bottom nav */
+  .nav-main-links { display: none; }
+  .nav-divider--desktop { display: none; }
+  .nav-profile-wrap--desktop { display: none; }
+
+  /* Bottom tab bar */
+  .nav-bottom {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    background: var(--nav-bg);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    z-index: 99;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    align-items: stretch;
+  }
+
+  .nav-bottom-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--nav-text-muted);
+    cursor: pointer;
+    padding: 8px 4px;
+    text-decoration: none;
+    transition: color var(--transition);
+    min-height: 60px;
+    touch-action: manipulation;
+  }
+  .nav-bottom-tab:hover,
+  .nav-bottom-tab--active { color: var(--accent); }
+
+  .nav-bottom-icon {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .nav-bottom-icon svg { width: 22px; height: 22px; }
+
+  .nav-bottom-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    font-family: var(--font);
+  }
+
+  .nav-bottom-profile-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+  }
+  .nav-bottom-profile-wrap .nav-bottom-tab {
+    flex: 1;
+    width: 100%;
+  }
+
+  .nav-dropdown--up {
+    top: auto;
+    bottom: calc(100% + 8px);
+    right: 8px;
+    left: auto;
+    min-width: 200px;
+  }
+
+  /* Larger tap targets in dropdown on mobile */
+  .nav-dropdown-item {
+    padding: 14px 16px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}

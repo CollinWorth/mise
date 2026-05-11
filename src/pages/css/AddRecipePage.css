@@ -251,6 +251,13 @@
   .ar-grid { grid-template-columns: 1fr; }
   .ar-col-2 { grid-column: 1; }
   .ar-import-row { flex-direction: column; }
+  .ar-ing-row { flex-wrap: wrap; }
+  .ar-ing-qty  { width: calc(40% - var(--space-1)); }
+  .ar-ing-unit { width: calc(60% - var(--space-1)); }
+  .ar-ing-name { width: 100%; }
+  .ar-footer { flex-direction: column; }
+  .ar-footer > button { width: 100%; justify-content: center; }
+  .ar-parse-btn { padding: 0.875rem; min-height: 48px; }
 }
 
 /* ── Edit Recipe form layout ── */
@@ -361,4 +368,7 @@
 @media (max-width: 560px) {
   .add-recipe-form-grid { grid-template-columns: 1fr; }
   .full-width { grid-column: 1; }
+  .add-recipe-actions { flex-direction: column; }
+  .add-recipe-actions > button { width: 100%; justify-content: center; }
+  .ingredient-row { flex-wrap: wrap; }
 }

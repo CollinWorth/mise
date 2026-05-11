@@ -412,13 +412,18 @@
   .recipe-grid { columns: 3; }
 }
 @media (max-width: 768px) {
-  .recipes-page { padding: var(--space-6) var(--space-4) var(--space-12); }
+  .recipes-page { padding: var(--space-6) var(--space-4) calc(var(--space-6) + 72px); }
   .recipes-toolbar { flex-direction: column; align-items: flex-start; }
   .recipes-toolbar-right { width: 100%; flex-wrap: wrap; }
-  .recipes-search-input { flex: 1; min-width: 140px; width: auto; }
-  .recipes-sort-select { flex-shrink: 0; }
-  .recipe-featured { height: 280px; }
-  .recipe-featured-overlay { padding: var(--space-5); }
+  .recipes-search-input { flex: 1; min-width: 140px; width: auto; min-height: 44px; font-size: 16px; }
+  .recipes-sort-select { flex-shrink: 0; min-height: 44px; }
+  .recipe-featured { height: 240px; }
+  .recipe-featured-overlay { padding: var(--space-4) var(--space-5); }
   .recipe-grid { columns: 2; column-gap: var(--space-3); }
   .recipe-card { margin-bottom: var(--space-3); }
+  .filter-chip { padding: var(--space-2) var(--space-3); min-height: 36px; }
+}
+@media (max-width: 420px) {
+  .recipe-grid { columns: 1; }
+  .recipe-featured { height: 200px; }
 }

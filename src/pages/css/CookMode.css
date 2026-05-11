@@ -57,7 +57,7 @@
   margin-bottom: var(--space-5);
 }
 .cm-step-text {
-  font-size: clamp(1.1rem, 2.5vw, 1.35rem); line-height: 1.7;
+  font-size: clamp(1.25rem, 4vw, 1.45rem); line-height: 1.75;
   color: rgba(255,255,255,0.92); font-weight: 400; margin: 0;
 }
 
@@ -69,6 +69,7 @@
   flex: 1; max-width: 160px; padding: var(--space-4) var(--space-5);
   border-radius: var(--radius); font-size: var(--text-base); font-weight: 600;
   cursor: pointer; transition: all var(--transition); border: none;
+  touch-action: manipulation;
 }
 .cm-nav-prev {
   background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
@@ -87,12 +88,16 @@
 
 /* ── Dots ── */
 .cm-dots {
-  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+  display: flex; gap: 6px; justify-content: center;
+  overflow-x: auto; flex-wrap: nowrap;
+  padding: 4px 8px; scrollbar-width: none;
 }
+.cm-dots::-webkit-scrollbar { display: none; }
 .cm-dot {
-  width: 8px; height: 8px; border-radius: 50%; border: none;
-  background: rgba(255,255,255,0.2); cursor: pointer;
+  width: 8px; height: 8px; min-width: 8px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.2); cursor: pointer; flex-shrink: 0;
   transition: all var(--transition); padding: 0;
+  touch-action: manipulation;
 }
 .cm-dot-done  { background: rgba(232,98,42,0.5); }
 .cm-dot-active { background: var(--accent); transform: scale(1.4); }
@@ -134,6 +139,14 @@
   transition: all var(--transition);
 }
 .cm-ing-checked .cm-ing-check { background: var(--success); border-color: var(--success); }
+
+@media (max-width: 480px) {
+  .cm-body { padding: var(--space-5) var(--space-4) var(--space-5); gap: var(--space-4); }
+  .cm-step-card { padding: var(--space-6) var(--space-5); }
+  .cm-header { padding: var(--space-3) var(--space-4); }
+  .cm-nav-btn { padding: var(--space-4) var(--space-4); font-size: var(--text-sm); }
+  .cm-ing-toggle { padding: var(--space-3) var(--space-4); }
+}
 
 /* ── Loading/empty ── */
 .cm-loading, .cm-empty {
