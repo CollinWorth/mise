@@ -167,6 +167,10 @@ button {
 }
 
 @media (max-width: 768px) {
+  /* Push all content below the status bar */
+  html { background: var(--bg); }
+  body { padding-top: env(safe-area-inset-top, 0px); }
+
   .page {
     padding: var(--space-5) var(--space-4) calc(var(--space-8) + 72px);
   }

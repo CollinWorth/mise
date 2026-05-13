@@ -58,7 +58,63 @@ export default function CalendarPage({ user }) {
   const [calMonth, setCalMonth]         = useState(today.getMonth());
   const [failedImgs, setFailedImgs]     = useState(() => new Set());
   const [pickerOpen, setPickerOpen]     = useState(false);
-  const closeSheet = () => { setPickerOpen(false); setSearchQuery(''); };
+  const [kbHeight,   setKbHeight]       = useState(0);
+  const sheetRef  = useRef(null);
+  const handleRef = useRef(null);
+
+  const closeSheet = useCallback(() => {
+    if (sheetRef.current) { sheetRef.current.style.transition = ''; sheetRef.current.style.transform = ''; }
+    setPickerOpen(false);
+    setSearchQuery('');
+  }, []);
+
+  // Track keyboard height via visualViewport (cross-platform keyboard avoidance)
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setKbHeight(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    vv.addEventListener('resize', update);
+    return () => vv.removeEventListener('resize', update);
+  }, []);
+
+  // Lock body scroll while sheet is open
+  useEffect(() => {
+    if (pickerOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [pickerOpen]);
+
+  // Swipe-to-dismiss gesture on the drag handle
+  useEffect(() => {
+    const handle = handleRef.current;
+    if (!handle) return;
+    let startY = 0, startT = 0, active = false;
+    const onStart = (e) => { startY = e.touches[0].clientY; startT = e.timeStamp; active = true; };
+    const onMove  = (e) => {
+      if (!active) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0) {
+        e.preventDefault();
+        if (sheetRef.current) { sheetRef.current.style.transition = 'none'; sheetRef.current.style.transform = `translateY(${dy}px)`; }
+      }
+    };
+    const onEnd = (e) => {
+      if (!active) return;
+      active = false;
+      const dy  = e.changedTouches[0].clientY - startY;
+      const vel = dy / Math.max(1, e.timeStamp - startT); // px/ms
+      if (sheetRef.current) { sheetRef.current.style.transition = ''; sheetRef.current.style.transform = ''; }
+      if (dy > 100 || vel > 0.5) closeSheet();
+    };
+    handle.addEventListener('touchstart', onStart, { passive: true });
+    handle.addEventListener('touchmove',  onMove,  { passive: false });
+    handle.addEventListener('touchend',   onEnd,   { passive: true });
+    return () => {
+      handle.removeEventListener('touchstart', onStart);
+      handle.removeEventListener('touchmove',  onMove);
+      handle.removeEventListener('touchend',   onEnd);
+    };
+  }, [closeSheet]);
 
   const weekDays = Array.from({length:7}, (_,i) => addDays(weekStart,i));
 
@@ -349,8 +405,12 @@ export default function CalendarPage({ user }) {
         className={`planner-sheet-backdrop${pickerOpen ? ' planner-sheet-backdrop--open' : ''}`}
         onClick={closeSheet}
       />
-      <div className={`planner-sheet${pickerOpen ? ' planner-sheet--open' : ''}`}>
-        <div className="planner-sheet-bar" onClick={closeSheet} />
+      <div
+        className={`planner-sheet${pickerOpen ? ' planner-sheet--open' : ''}`}
+        ref={sheetRef}
+        style={kbHeight > 0 ? { bottom: `${kbHeight}px`, maxHeight: `calc(100vh - ${kbHeight}px - 60px)` } : undefined}
+      >
+        <div className="planner-sheet-bar" ref={handleRef} onClick={closeSheet} />
         <div className="planner-sheet-head">
           <span className="planner-sheet-title">
             Add to <strong>{sameDay(selectedDate, today) ? 'Today' : DAY_FULL[selectedDate.getDay()]}</strong>

@@ -523,7 +523,7 @@
 
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
-  .grocery-page { padding: var(--space-6) var(--space-4) calc(var(--space-8) + 72px); }
+  .grocery-page { padding: calc(var(--space-6) + env(safe-area-inset-top, 0px)) var(--space-4) calc(var(--space-8) + 72px); }
   .grocery-action-btn { min-height: 44px; padding: var(--space-2) var(--space-4); }
   .mp-stepper-btn { width: 36px; height: 36px; }
   .mp-nav-btn { width: 36px; height: 36px; }

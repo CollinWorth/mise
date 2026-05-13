@@ -414,7 +414,7 @@
   .recipe-grid { columns: 3; }
 }
 @media (max-width: 768px) {
-  .recipes-page { padding: var(--space-6) var(--space-4) calc(var(--space-6) + 72px); }
+  .recipes-page { padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--space-4) calc(var(--space-6) + 72px); }
   .recipes-toolbar { flex-direction: column; align-items: flex-start; }
   .recipes-toolbar-right { width: 100%; flex-wrap: wrap; }
   .recipes-search-input { flex: 1; min-width: 140px; width: auto; min-height: 44px; font-size: 16px; }
