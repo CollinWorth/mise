@@ -251,6 +251,14 @@
   background: var(--border); padding: 2px 7px; border-radius: 99px;
   flex-shrink: 0; white-space: nowrap;
 }
+.mp-add-pantry-btn {
+  font-size: 10px; font-weight: 600; color: var(--text-tertiary);
+  background: transparent; border: 1px solid var(--border);
+  padding: 2px 7px; border-radius: 99px; cursor: pointer;
+  flex-shrink: 0; white-space: nowrap;
+  transition: border-color var(--transition), color var(--transition);
+}
+.mp-add-pantry-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Pantry section ──────────────────────────────── */
 .mp-pantry-section {
@@ -448,6 +456,28 @@
   width: 0;
   box-shadow: 0 0 0 3px var(--accent-light);
 }
+
+.grocery-edit-group {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  align-items: center;
+}
+.grocery-edit-qty,
+.grocery-edit-unit,
+.grocery-edit-name {
+  font-size: var(--text-sm);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--accent);
+  background: var(--surface);
+  color: var(--text-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.grocery-edit-qty  { width: 52px; min-width: 0; }
+.grocery-edit-unit { width: 68px; min-width: 0; }
+.grocery-edit-name { flex: 1; min-width: 0; }
 
 /* ── Remove ─────────────────────────────────────────── */
 .grocery-remove {

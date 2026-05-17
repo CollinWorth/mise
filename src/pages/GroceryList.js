@@ -94,26 +94,24 @@ function mergeIngredients(recipes) {
     for (const ing of (recipe.ingredients || [])) {
       if (!(ing.name || '').trim()) continue;
       const key  = normalizeIngKey(ing.name);
-      const qty  = parseFraction(ing.quantity) * mult;
-      const unit = normalizeUnit(ing.unit);
+      const { qty: rawQty, unit: rawUnit } = parseQtyUnit(ing.quantity, ing.unit);
+      const qty  = rawQty * mult;
+      const unit = normalizeUnit(rawUnit);
       if (result[key]) {
         const ex = result[key];
-        // Add quantities when units match
         if (ex.unit === unit) {
           const combined = parseFraction(ex.quantity) + qty;
           if (combined > 0) ex.quantity = fmtQty(combined);
         } else if (!ex.unit && unit) {
-          // Adopt unit if existing entry had none
-          ex.unit = ing.unit;
+          ex.unit = unit;
           if (qty > 0) ex.quantity = fmtQty(parseFraction(ex.quantity) + qty);
         }
-        // Keep the more descriptive display name (longer = more specific)
         if (ing.name.length > ex.name.length) ex.name = ing.name;
       } else {
         result[key] = {
           name: ing.name,
           quantity: qty > 0 ? fmtQty(qty) : (ing.quantity || ''),
-          unit: ing.unit || '',
+          unit: unit || '',
         };
       }
     }
@@ -198,6 +196,17 @@ function parseInput(raw) {
     return { name: name || rest, quantity, unit };
   }
   return { name: rest, quantity, unit: '' };
+}
+
+function parseQtyUnit(qtyStr, unitStr) {
+  if (unitStr && unitStr.trim()) return { qty: parseFraction(qtyStr) || 0, unit: unitStr.trim() };
+  const s = String(qtyStr || '').trim();
+  const numMatch = s.match(/^([\d\s\/½⅓¼¾⅔⅛⅜⅝⅞]+(?:\.\d+)?)\s*/);
+  if (!numMatch) return { qty: 0, unit: '' };
+  const rest = s.slice(numMatch[0].length).trim();
+  const unitMatch = rest.match(UNITS_RE);
+  if (unitMatch) return { qty: parseFraction(numMatch[1].trim()) || 0, unit: unitMatch[0] };
+  return { qty: parseFraction(s) || 0, unit: '' };
 }
 
 const QUICK_ITEMS = [
@@ -346,22 +355,20 @@ export default function GroceryList({ user }) {
     }
   };
 
-  const saveEdit = async (oldName, newValue) => {
-    const parsed = parseInput(newValue);
-    if (!parsed.name.trim()) { setEditingItem(null); return; }
-    const updated = { name: parsed.name, quantity: parsed.quantity, unit: parsed.unit, category: categorize(parsed.name) };
-    setList(l => ({ ...l, items: l.items.map(i => i.name === oldName ? { ...i, ...updated } : i) }));
+  const saveEdit = async () => {
+    if (!editingItem) return;
+    const { originalName, name, quantity, unit } = editingItem;
+    if (!name.trim()) { setEditingItem(null); return; }
+    const updated = { name: name.trim(), quantity: quantity || '', unit: unit || '', category: categorize(name.trim()) };
+    setList(l => ({ ...l, items: l.items.map(i => i.name === originalName ? { ...i, ...updated } : i) }));
     setEditingItem(null);
-    // Delete old + add new if name changed
-    if (parsed.name !== oldName) {
-      try {
-        await apiFetch(`/groceryList/${list._id}/${encodeURIComponent(oldName)}`, { method: 'DELETE' });
-        await apiFetch(`/groceryList/${list._id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ ...updated, checked: false }),
-        });
-      } catch {}
-    }
+    try {
+      await apiFetch(`/groceryList/${list._id}/${encodeURIComponent(originalName)}`, { method: 'DELETE' });
+      await apiFetch(`/groceryList/${list._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...updated, checked: false }),
+      });
+    } catch {}
   };
 
   const clearChecked = async () => {
@@ -649,7 +656,18 @@ export default function GroceryList({ user }) {
                           onChange={() => setMpIngSelected(s => ({ ...s, [i]: !checked }))}
                         />
                         <span className="mp-ing-name">{ing.name}</span>
-                        {inPantry && !checked && <span className="mp-pantry-badge">in pantry</span>}
+                        {inPantry ? (
+                          <span className="mp-pantry-badge">in pantry</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="mp-add-pantry-btn"
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); addToPantry(ing.name); }}
+                            title="Add to pantry"
+                          >
+                            + pantry
+                          </button>
+                        )}
                         {(ing.quantity || ing.unit) && (
                           <span className="mp-ing-qty">{[ing.quantity, ing.unit].filter(Boolean).join(' ')}</span>
                         )}
@@ -727,11 +745,11 @@ export default function GroceryList({ user }) {
                     <GroceryItemRow
                       key={idx}
                       item={{ ...item, category: item._effectiveCat }}
-                      editing={editingItem?.name === item.name}
-                      editValue={editingItem?.name === item.name ? editingItem.value : ''}
-                      onEditStart={() => setEditingItem({ name: item.name, value: [item.quantity, item.unit, item.name].filter(Boolean).join(' ') })}
-                      onEditChange={v => setEditingItem(e => ({ ...e, value: v }))}
-                      onEditSave={() => saveEdit(item.name, editingItem.value)}
+                      editing={editingItem?.originalName === item.name}
+                      editItem={editingItem?.originalName === item.name ? editingItem : null}
+                      onEditStart={() => setEditingItem({ originalName: item.name, name: item.name, quantity: item.quantity || '', unit: item.unit || '' })}
+                      onEditChange={(field, val) => setEditingItem(e => ({ ...e, [field]: val }))}
+                      onEditSave={saveEdit}
                       onEditCancel={() => setEditingItem(null)}
                       onToggle={() => toggleItem(item.name, item.checked)}
                       onRemove={() => removeItem(item.name)}
@@ -773,13 +791,20 @@ export default function GroceryList({ user }) {
   );
 }
 
-function GroceryItemRow({ item, editing, editValue, onEditStart, onEditChange, onEditSave, onEditCancel, onToggle, onRemove, onCategoryChange }) {
-  const qtyLabel = [item.quantity, item.unit].filter(Boolean).join(' ');
-  const editRef  = useRef(null);
-  const catRef   = useRef(null);
+function GroceryItemRow({ item, editing, editItem, onEditStart, onEditChange, onEditSave, onEditCancel, onToggle, onRemove, onCategoryChange }) {
+  const qtyLabel    = [item.quantity, item.unit].filter(Boolean).join(' ');
+  const editRef     = useRef(null);
+  const editGroupRef = useRef(null);
+  const catRef      = useRef(null);
   const [showCatMenu, setShowCatMenu] = useState(false);
 
   useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
+
+  const handleEditBlur = (e) => {
+    if (editGroupRef.current && !editGroupRef.current.contains(e.relatedTarget)) {
+      onEditSave();
+    }
+  };
 
   useEffect(() => {
     if (!showCatMenu) return;
@@ -797,14 +822,33 @@ function GroceryItemRow({ item, editing, editValue, onEditStart, onEditChange, o
       </button>
 
       {editing ? (
-        <input
-          ref={editRef}
-          className="grocery-edit-input"
-          value={editValue}
-          onChange={e => onEditChange(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') onEditSave(); if (e.key === 'Escape') onEditCancel(); }}
-          onBlur={onEditSave}
-        />
+        <div ref={editGroupRef} className="grocery-edit-group">
+          <input
+            ref={editRef}
+            className="grocery-edit-qty"
+            value={editItem?.quantity || ''}
+            onChange={e => onEditChange('quantity', e.target.value)}
+            placeholder="Qty"
+            onKeyDown={e => { if (e.key === 'Enter') onEditSave(); if (e.key === 'Escape') onEditCancel(); }}
+            onBlur={handleEditBlur}
+          />
+          <input
+            className="grocery-edit-unit"
+            value={editItem?.unit || ''}
+            onChange={e => onEditChange('unit', e.target.value)}
+            placeholder="Unit"
+            onKeyDown={e => { if (e.key === 'Enter') onEditSave(); if (e.key === 'Escape') onEditCancel(); }}
+            onBlur={handleEditBlur}
+          />
+          <input
+            className="grocery-edit-name"
+            value={editItem?.name || ''}
+            onChange={e => onEditChange('name', e.target.value)}
+            placeholder="Name"
+            onKeyDown={e => { if (e.key === 'Enter') onEditSave(); if (e.key === 'Escape') onEditCancel(); }}
+            onBlur={handleEditBlur}
+          />
+        </div>
       ) : (
         <span className="grocery-item-name" onDoubleClick={onEditStart}>{item.name}</span>
       )}

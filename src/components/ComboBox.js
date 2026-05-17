@@ -96,7 +96,10 @@ export default function ComboBox({ value = '', onChange, suggestions = [], place
         placeholder={placeholder}
         onChange={e => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }}
+        onKeyDown={e => {
+          if (e.key === 'Escape') setOpen(false);
+          if (e.key === 'Enter') { e.preventDefault(); if (open && filtered.length > 0) selectSingle(filtered[0]); }
+        }}
       />
       {open && filtered.length > 0 && (
         <ul className="cb-dropdown">
