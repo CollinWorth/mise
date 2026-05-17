@@ -85,6 +85,8 @@ export default function UserProfilePage({ user: currentUser }) {
   return (
     <div className="up-page page">
 
+      <button className="up-back-btn" onClick={() => navigate(-1)}>← Back</button>
+
       {/* ── Profile header ── */}
       <div className="up-header">
         <div className="up-avatar">{initial}</div>
