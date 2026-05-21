@@ -80,7 +80,7 @@ function EditRecipe({ user }) {
         );
         setLoading(false);
       });
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading) stepRefs.current.forEach(autoResize);

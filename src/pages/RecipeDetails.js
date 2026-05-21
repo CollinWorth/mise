@@ -154,7 +154,6 @@ export default function RecipeDetails({ user }) {
 
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const isOwner = user && (user.id === recipe.user_id || user._id === recipe.user_id);
-  const isPublic = recipe.is_public;
   const fromPath = location.state?.from || '';
   const backLabel = /discover|explore|feed/.test(fromPath) ? 'Discover' : 'Recipes';
 

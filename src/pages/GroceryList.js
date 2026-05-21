@@ -185,7 +185,7 @@ const UNITS_RE = /^(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|
 
 function parseInput(raw) {
   const s = raw.trim();
-  const m = s.match(/^([\d\s\/½⅓¼¾⅔⅛⅜⅝⅞]+(?:\.\d+)?)\s*/);
+  const m = s.match(/^([\d\s/½⅓¼¾⅔⅛⅜⅝⅞]+(?:\.\d+)?)\s*/);
   if (!m) return { name: s, quantity: '', unit: '' };
   const quantity = m[1].trim();
   const rest = s.slice(m[0].length);
@@ -201,7 +201,7 @@ function parseInput(raw) {
 function parseQtyUnit(qtyStr, unitStr) {
   if (unitStr && unitStr.trim()) return { qty: parseFraction(qtyStr) || 0, unit: unitStr.trim() };
   const s = String(qtyStr || '').trim();
-  const numMatch = s.match(/^([\d\s\/½⅓¼¾⅔⅛⅜⅝⅞]+(?:\.\d+)?)\s*/);
+  const numMatch = s.match(/^([\d\s/½⅓¼¾⅔⅛⅜⅝⅞]+(?:\.\d+)?)\s*/);
   if (!numMatch) return { qty: 0, unit: '' };
   const rest = s.slice(numMatch[0].length).trim();
   const unitMatch = rest.match(UNITS_RE);

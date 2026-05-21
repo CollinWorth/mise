@@ -40,7 +40,7 @@ export default function UserProfilePage({ user: currentUser }) {
       if (followStatus) setIsFollowing(followStatus.is_following);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [id, currentUser, isOwnProfile]);
+  }, [id, currentUser, isOwnProfile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openFollowModal = async (type) => {
     setFollowModal(type);
