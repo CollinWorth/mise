@@ -141,7 +141,9 @@ function NavBar({ user, onLogout }) {
                 onClick={() => setProfileOpen(o => !o)}
                 aria-label="Profile menu"
               >
-                <span className="nav-bottom-icon"><ProfileIcon /></span>
+                <span className="nav-bottom-icon">
+                  <span className="nav-bottom-avatar">{user.name?.[0]?.toUpperCase() ?? '?'}</span>
+                </span>
                 <span className="nav-bottom-label">Profile</span>
               </button>
               {profileOpen && (

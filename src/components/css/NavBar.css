@@ -168,6 +168,12 @@
     flex-shrink: 0;
   }
   .nav-bottom-icon svg { width: 22px; height: 22px; }
+  .nav-bottom-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
 
   .nav-bottom-label {
     font-size: 10px;

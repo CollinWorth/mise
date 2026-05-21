@@ -298,7 +298,7 @@ async def explore_recipes(skip: int = 0, limit: int = 100, user_id: str | None =
     query: dict = {"is_public": True, "is_modified": {"$ne": True}, "original_recipe_id": None}
     if user_id:
         query["user_id"] = {"$ne": ObjectId(user_id)}
-    cursor = recipes_collection.find(query).skip(skip).limit(limit)
+    cursor = recipes_collection.find(query).sort("_id", -1).skip(skip).limit(limit)
     results = []
     async for r in cursor:
         results.append(recipe_to_json(r))
@@ -312,7 +312,7 @@ async def get_recipes_by_user(user_id: str):
         user_obj_id = ObjectId(user_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user_id format")
-    recipes = await recipes_collection.find({"user_id": user_obj_id}).to_list(1000)
+    recipes = await recipes_collection.find({"user_id": user_obj_id}).sort("_id", -1).to_list(1000)
     return [recipe_to_json(r) for r in recipes]
 
 

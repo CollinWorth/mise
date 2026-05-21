@@ -250,6 +250,8 @@
   overflow: hidden;
   cursor: pointer;
   background: #1A1918;
+  outline: none;
+  position: relative;
 }
 
 /* ── Image card ─────────────────────────────────────── */
@@ -294,11 +296,11 @@
 /* ── Text-only card (no image) ──────────────────────── */
 .recipe-card--text {
   border: none;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .recipe-card--text:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.10);
   transform: translateY(-1px);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .recipe-card-text {
   padding: var(--space-6) var(--space-5);

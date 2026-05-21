@@ -305,8 +305,9 @@ export default function DiscoverPage({ user }) {
                       {recipe.category && <span className="feed-post-category">{recipe.category}</span>}
                     </div>
                     <div className="feed-post-img" onClick={() => goToRecipe(id)}>
-                      {recipe.image_url
-                        ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy" />
+                      {recipe.image_url && !failedImages.has(id)
+                        ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
+                            onError={() => setFailedImages(prev => new Set(prev).add(id))} />
                         : <div className="feed-post-placeholder" style={{background: cuisineBg(recipe.cuisine)}}>
                             {recipe.category && <span className="feed-placeholder-pill">{recipe.category}</span>}
                             <span className="feed-post-placeholder-name">{recipe.recipe_name}</span>
