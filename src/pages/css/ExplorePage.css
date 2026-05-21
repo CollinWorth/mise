@@ -131,13 +131,15 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
+  transform: translateZ(0);
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+  z-index: 0;
 }
 .ex-card:hover {
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
   box-shadow: var(--shadow-lg);
   border-color: var(--border-strong);
-  position: relative;
   z-index: 1;
 }
 .ex-card--no-image { border: none; }
@@ -147,6 +149,7 @@
 .ex-card-img {
   position: relative;
   overflow: hidden;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 .ex-card-img img {
   width: 100%;
