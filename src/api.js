@@ -2,12 +2,11 @@ const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export function imgUrl(url) {
   if (!url) return url;
-  // Only rewrite URLs our backend stored with a localhost base, or bare /uploads/ paths.
-  // Leave external URLs (CDNs, WordPress, etc.) untouched even if they contain "/uploads/".
-  if (/^https?:\/\/localhost(:\d+)?\/uploads\//.test(url)) {
-    return `${API}${url.substring(url.indexOf('/uploads/'))}`;
+  if (/^https?:\/\/localhost(:\d+)?\//.test(url)) {
+    const path = url.replace(/^https?:\/\/localhost(:\d+)?/, '');
+    return `${API}${path}`;
   }
-  if (url.startsWith('/uploads/')) {
+  if (url.startsWith('/uploads/') || url.startsWith('/images/')) {
     return `${API}${url}`;
   }
   return url;

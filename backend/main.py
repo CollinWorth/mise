@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 import os
-from database import client, db
+from bson import ObjectId
+from database import client, db, images_collection
 from routers import users, recipes, mealPlans, groceryList, follows, comments, ratings
 
 app = FastAPI()
@@ -24,8 +25,15 @@ app.include_router(follows.router,     prefix="/follows",     tags=["follows"])
 app.include_router(comments.router,    prefix="/comments",    tags=["comments"])
 app.include_router(ratings.router,     prefix="/ratings",     tags=["ratings"])
 
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+@app.get("/images/{image_id}")
+async def serve_image(image_id: str):
+    try:
+        doc = await images_collection.find_one({"_id": ObjectId(image_id)})
+    except Exception:
+        raise HTTPException(status_code=404)
+    if not doc:
+        raise HTTPException(status_code=404)
+    return Response(content=doc["data"], media_type=doc.get("content_type", "image/jpeg"))
 
 @app.on_event("startup")
 async def startup_db_client():

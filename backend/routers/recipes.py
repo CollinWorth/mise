@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from bson import ObjectId
-from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection, ratings_collection
+from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection, ratings_collection, images_collection
 from model import Recipe
 from auth import get_current_user_id, get_optional_user_id
 from pydantic import BaseModel
@@ -1028,12 +1028,11 @@ async def delete_recipe(recipe_id: str, user_id: str = Depends(get_current_user_
 
 @router.post("/upload-image")
 async def upload_image(request: Request, file: UploadFile = File(...), _: str = Depends(get_current_user_id)):
-    ext = os.path.splitext(file.filename or "")[1] or ".jpg"
-    filename = f"{uuid.uuid4().hex}{ext}"
-    os.makedirs("uploads", exist_ok=True)
-    with open(f"uploads/{filename}", "wb") as f:
-        f.write(await file.read())
-    return {"url": f"{_public_base_url(request)}/uploads/{filename}"}
+    content_type = file.content_type or "image/jpeg"
+    data = await file.read()
+    result = await images_collection.insert_one({"data": data, "content_type": content_type})
+    image_id = str(result.inserted_id)
+    return {"url": f"{_public_base_url(request)}/images/{image_id}"}
 
 
 @router.post("/{recipe_id}/{selected_day}/{user_id}")
