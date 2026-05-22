@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../api';
 import ComboBox from '../components/ComboBox';
@@ -41,6 +41,8 @@ function EditRecipe({ user }) {
   const [categorySuggestions, setCategorySuggestions] = useState(BASE_CATEGORIES);
   const [tagSuggestions, setTagSuggestions]           = useState(BASE_TAGS);
   const stepRefs = useRef([]);
+  const dragIdx  = useRef(null);
+  const [dragOver, setDragOver] = useState(null);
 
   const autoResize = el => {
     if (!el) return;
@@ -70,7 +72,7 @@ function EditRecipe({ user }) {
         });
         setIngredients(
           recipe.ingredients?.length
-            ? recipe.ingredients.map(i => ({ name: i.name || '', quantity: i.quantity || '', unit: i.unit || '' }))
+            ? recipe.ingredients.map(i => ({ name: i.name || '', quantity: i.quantity || '', unit: i.unit || '', is_section: i.is_section || false }))
             : [{ name: '', quantity: '', unit: '' }]
         );
         setSteps(
@@ -88,6 +90,20 @@ function EditRecipe({ user }) {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  const handleStepDragStart = useCallback((idx) => { dragIdx.current = idx; }, []);
+  const handleStepDragOver  = useCallback((e, idx) => { e.preventDefault(); setDragOver(idx); }, []);
+  const handleStepDrop      = useCallback((idx) => {
+    if (dragIdx.current === null || dragIdx.current === idx) { dragIdx.current = null; setDragOver(null); return; }
+    setSteps(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIdx.current, 1);
+      next.splice(idx, 0, moved);
+      return next;
+    });
+    dragIdx.current = null;
+    setDragOver(null);
+  }, []);
+
   const handleIngredientChange = (idx, e) => {
     setIngredients(ingredients.map((ing, i) =>
       i === idx ? { ...ing, [e.target.name]: e.target.value } : ing
@@ -99,7 +115,7 @@ function EditRecipe({ user }) {
     setSubmitting(true);
     const recipe = {
       ...form,
-      ingredients: ingredients.map(ing => ({ name: ing.name, quantity: ing.quantity, unit: ing.unit })),
+      ingredients: ingredients.filter(i => i.name).map(({ name, quantity, unit, is_section }) => ({ name, quantity, unit, is_section: is_section || false })),
       instructions: steps.filter(s => s.trim()).join('\n'),
       prep_time: form.prep_time ? Number(form.prep_time) : undefined,
       cook_time: form.cook_time ? Number(form.cook_time) : undefined,
@@ -204,30 +220,55 @@ function EditRecipe({ user }) {
           <label className="full-width">
             Ingredients
             {ingredients.map((ingredient, idx) => (
-              <div key={idx} className="ingredient-row">
-                <input type="text" name="name" placeholder="Name" value={ingredient.name}
-                  onChange={(e) => handleIngredientChange(idx, e)} />
-                <input type="text" name="quantity" placeholder="Qty" value={ingredient.quantity}
-                  onChange={(e) => handleIngredientChange(idx, e)} />
-                <input type="text" name="unit" placeholder="Unit" value={ingredient.unit}
-                  onChange={(e) => handleIngredientChange(idx, e)} />
-                {ingredients.length > 1 && (
+              ingredient.is_section ? (
+                <div key={idx} className="ingredient-section-row">
+                  <span className="ingredient-section-label">Section</span>
+                  <input className="ingredient-section-input" placeholder="e.g. Frosting" value={ingredient.name}
+                    onChange={e => setIngredients(ingredients.map((ing, i) => i === idx ? { ...ing, name: e.target.value } : ing))} />
                   <button type="button" className="btn-remove-ingredient"
                     onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div key={idx} className="ingredient-row">
+                  <input type="text" name="name" placeholder="Name" value={ingredient.name}
+                    onChange={(e) => handleIngredientChange(idx, e)} />
+                  <input type="text" name="quantity" placeholder="Qty" value={ingredient.quantity}
+                    onChange={(e) => handleIngredientChange(idx, e)} />
+                  <input type="text" name="unit" placeholder="Unit" value={ingredient.unit}
+                    onChange={(e) => handleIngredientChange(idx, e)} />
+                  {ingredients.length > 1 && (
+                    <button type="button" className="btn-remove-ingredient"
+                      onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
+                  )}
+                </div>
+              )
             ))}
-            <button type="button" className="btn-add-ingredient"
-              onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }])}>
-              + Add ingredient
-            </button>
+            <div className="ing-add-row">
+              <button type="button" className="btn-add-ingredient"
+                onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '', is_section: false }])}>
+                + Add ingredient
+              </button>
+              <button type="button" className="btn-add-section"
+                onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '', is_section: true }])}>
+                + Add section
+              </button>
+            </div>
           </label>
 
           <div className="full-width">
             Instructions
             <div className="ar-steps">
               {steps.map((step, idx) => (
-                <div key={idx} className="ar-step-row">
+                <div
+                  key={idx}
+                  className={`ar-step-row${dragOver === idx ? ' ar-step-row--drag-over' : ''}`}
+                  draggable
+                  onDragStart={() => handleStepDragStart(idx)}
+                  onDragOver={e => handleStepDragOver(e, idx)}
+                  onDrop={() => handleStepDrop(idx)}
+                  onDragEnd={() => { dragIdx.current = null; setDragOver(null); }}
+                >
+                  <span className="ar-drag-handle">⠿</span>
                   <span className="ar-step-num">{idx + 1}</span>
                   <textarea
                     className="ar-step-input"

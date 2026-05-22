@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import ComboBox from '../components/ComboBox';
@@ -47,7 +47,9 @@ export default function AddRecipe({ user }) {
   const navigate = useNavigate();
   const [method, setMethod]           = useState(null);
   const [form, setForm]               = useState(() => emptyForm(user));
-  const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: '' }]);
+  const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: '', is_section: false }]);
+  const dragIdx = useRef(null);
+  const [dragOver, setDragOver] = useState(null);
   const [steps, setSteps]             = useState(['']);
   const [importing, setImporting]     = useState(false);
   const [imported, setImported]       = useState(false);
@@ -129,7 +131,7 @@ export default function AddRecipe({ user }) {
     const recipe = {
       ...form,
       instructions: steps.filter(Boolean).join('\n'),
-      ingredients: ingredients.filter(i => i.name).map(({ name, quantity, unit }) => ({ name, quantity, unit })),
+      ingredients: ingredients.filter(i => i.name).map(({ name, quantity, unit, is_section }) => ({ name, quantity, unit, is_section: is_section || false })),
       prep_time: form.prep_time ? Number(form.prep_time) : undefined,
       cook_time: form.cook_time ? Number(form.cook_time) : undefined,
       servings:  form.servings  ? Number(form.servings)  : undefined,
@@ -146,6 +148,18 @@ export default function AddRecipe({ user }) {
 
   const updateIng  = (idx, field, val) => setIngredients(ingredients.map((x, i) => i === idx ? { ...x, [field]: val } : x));
   const updateStep = (idx, val)        => setSteps(steps.map((s, i) => i === idx ? val : s));
+
+  const handleStepDragStart = (idx) => { dragIdx.current = idx; };
+  const handleStepDragOver  = (e, idx) => { e.preventDefault(); setDragOver(idx); };
+  const handleStepDrop      = (idx) => {
+    if (dragIdx.current === null || dragIdx.current === idx) { dragIdx.current = null; setDragOver(null); return; }
+    const next = [...steps];
+    const [moved] = next.splice(dragIdx.current, 1);
+    next.splice(idx, 0, moved);
+    setSteps(next);
+    dragIdx.current = null;
+    setDragOver(null);
+  };
 
   const goBack = () => { setMethod(null); setImported(false); setImportError(''); };
 
@@ -306,6 +320,13 @@ export default function AddRecipe({ user }) {
               <label className="full-width">
                 Ingredients
                 {ingredients.map((ing, idx) => (
+                  ing.is_section ? (
+                    <div key={idx} className="ingredient-section-row">
+                      <span className="ingredient-section-label">Section</span>
+                      <input className="ingredient-section-input" placeholder="e.g. Frosting" value={ing.name} onChange={e => updateIng(idx, 'name', e.target.value)} />
+                      <button type="button" className="btn-remove-ingredient" onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
+                    </div>
+                  ) : (
                   <div key={idx} className="ingredient-row">
                     <input type="text" placeholder="Name" value={ing.name} onChange={e => updateIng(idx, 'name', e.target.value)} />
                     <input type="text" placeholder="Qty" value={ing.quantity} onChange={e => updateIng(idx, 'quantity', e.target.value)} />
@@ -314,17 +335,32 @@ export default function AddRecipe({ user }) {
                       <button type="button" className="btn-remove-ingredient" onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}>✕</button>
                     )}
                   </div>
+                  )
                 ))}
-                <button type="button" className="btn-add-ingredient" onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '' }])}>
-                  + Add ingredient
-                </button>
+                <div className="ing-add-row">
+                  <button type="button" className="btn-add-ingredient" onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '', is_section: false }])}>
+                    + Add ingredient
+                  </button>
+                  <button type="button" className="btn-add-section" onClick={() => setIngredients([...ingredients, { name: '', quantity: '', unit: '', is_section: true }])}>
+                    + Add section
+                  </button>
+                </div>
               </label>
 
               <div className="full-width">
                 Instructions
                 <div className="ar-steps">
                   {steps.map((step, idx) => (
-                    <div key={idx} className="ar-step-row">
+                    <div
+                      key={idx}
+                      className={`ar-step-row${dragOver === idx ? ' ar-step-row--drag-over' : ''}`}
+                      draggable
+                      onDragStart={() => handleStepDragStart(idx)}
+                      onDragOver={e => handleStepDragOver(e, idx)}
+                      onDrop={() => handleStepDrop(idx)}
+                      onDragEnd={() => { dragIdx.current = null; setDragOver(null); }}
+                    >
+                      <span className="ar-drag-handle">⠿</span>
                       <span className="ar-step-num">{idx + 1}</span>
                       <textarea
                         className="ar-step-input"

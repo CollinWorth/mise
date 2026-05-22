@@ -302,6 +302,9 @@ export default function RecipeDetails({ user }) {
             </div>
             <ul className="rd-ing-list">
               {recipe.ingredients.map((ing, idx) => (
+                ing.is_section ? (
+                  <li key={idx} className="rd-ing-section">{ing.name}</li>
+                ) : (
                 <li
                   key={idx}
                   className={`rd-ing-item${checked[idx] ? ' rd-ing-checked' : ''}`}
@@ -312,6 +315,7 @@ export default function RecipeDetails({ user }) {
                     {[scaleQty(ing.quantity), ing.unit, ing.name].filter(Boolean).join(' ')}
                   </span>
                 </li>
+                )
               ))}
             </ul>
           </div>

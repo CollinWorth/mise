@@ -5,7 +5,8 @@ from typing import Optional, List
 class Ingredient(BaseModel):
     name: str
     quantity: str
-    unit: str 
+    unit: str
+    is_section: Optional[bool] = False
 
 
 class Recipe(BaseModel):
