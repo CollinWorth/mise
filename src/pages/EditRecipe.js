@@ -179,10 +179,15 @@ function EditRecipe({ user }) {
     <div className="page">
       <div className="page-header">
         <h1>Edit Recipe</h1>
-        <button className="btn-ghost" onClick={() => navigate(`/recipes/${id}`)}>Cancel</button>
+        <div style={{display:'flex',gap:'8px'}}>
+          <button className="btn-primary" form="edit-recipe-form" type="submit" disabled={submitting}>
+            {submitting ? 'Saving…' : 'Save'}
+          </button>
+          <button className="btn-ghost" onClick={() => navigate(`/recipes/${id}`)}>Cancel</button>
+        </div>
       </div>
 
-      <form className="add-recipe-form" onSubmit={handleSubmit}>
+      <form id="edit-recipe-form" className="add-recipe-form" onSubmit={handleSubmit}>
         <div className="add-recipe-form-grid">
           <label>
             Title
