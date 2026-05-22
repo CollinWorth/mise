@@ -12,12 +12,32 @@ export default function CookMode() {
   const [checked, setChecked]   = useState({});
   const [ingOpen, setIngOpen]   = useState(false);
 
+  const CHECKS_TTL = 5 * 60 * 1000;
+  const checksKey = `mise_checks_${id}`;
+
   useEffect(() => {
     apiFetch(`/recipes/${id}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { setRecipe(data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [id]);
+    try {
+      const raw = localStorage.getItem(checksKey);
+      if (raw) {
+        const { ing, ts } = JSON.parse(raw);
+        if (Date.now() - ts < CHECKS_TTL && ing) setChecked(ing);
+        else localStorage.removeItem(checksKey);
+      }
+    } catch {}
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleIng = (idx) => {
+    const next = c => ({ ...c, [idx]: !c[idx] });
+    setChecked(prev => {
+      const updated = next(prev);
+      try { localStorage.setItem(checksKey, JSON.stringify({ ing: updated, ts: Date.now() })); } catch {}
+      return updated;
+    });
+  };
 
   const steps = recipe?.instructions
     ? recipe.instructions.split('\n').map(s => s.replace(/^\d+[.)]\s*/, '').trim()).filter(Boolean)
@@ -106,7 +126,7 @@ export default function CookMode() {
                 <li
                   key={idx}
                   className={`cm-ing-item${checked[idx] ? ' cm-ing-checked' : ''}`}
-                  onClick={() => setChecked(c => ({ ...c, [idx]: !c[idx] }))}
+                  onClick={() => toggleIng(idx)}
                 >
                   <span className="cm-ing-check">{checked[idx] ? '✓' : ''}</span>
                   <span>{[ing.quantity, ing.unit, ing.name].filter(Boolean).join(' ')}</span>

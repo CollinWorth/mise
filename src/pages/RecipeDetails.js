@@ -33,7 +33,8 @@ export default function RecipeDetails({ user }) {
   const [recipe, setRecipe]     = useState(null);
   const [loading, setLoading]   = useState(true);
   const [servings, setServings] = useState(null);
-  const [checked, setChecked]   = useState({});
+  const [checked, setChecked]         = useState({});
+  const [stepsChecked, setStepsChecked] = useState({});
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -46,6 +47,30 @@ export default function RecipeDetails({ user }) {
   const [raters, setRaters] = useState([]);
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const CHECKS_TTL = 5 * 60 * 1000;
+  const checksKey = `mise_checks_${id}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(checksKey);
+      if (raw) {
+        const { ing, steps, ts } = JSON.parse(raw);
+        if (Date.now() - ts < CHECKS_TTL) {
+          if (ing)   setChecked(ing);
+          if (steps) setStepsChecked(steps);
+        } else {
+          localStorage.removeItem(checksKey);
+        }
+      }
+    } catch {}
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(checksKey, JSON.stringify({ ing: checked, steps: stepsChecked, ts: Date.now() }));
+    } catch {}
+  }, [checked, stepsChecked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
@@ -138,7 +163,8 @@ export default function RecipeDetails({ user }) {
     else alert('Failed to delete recipe');
   };
 
-  const toggleIng = (idx) => setChecked(c => ({ ...c, [idx]: !c[idx] }));
+  const toggleIng  = (idx) => setChecked(c => ({ ...c, [idx]: !c[idx] }));
+  const toggleStep = (idx) => setStepsChecked(c => ({ ...c, [idx]: !c[idx] }));
 
   if (loading) return (
     <div className="page rd-page">
@@ -296,8 +322,8 @@ export default function RecipeDetails({ user }) {
               <h2 className="rd-panel-title">Instructions</h2>
               <ol className="rd-steps">
                 {steps.map((step, idx) => (
-                  <li key={idx} className="rd-step">
-                    <span className="rd-step-num">{idx + 1}</span>
+                  <li key={idx} className={`rd-step${stepsChecked[idx] ? ' rd-step--done' : ''}`} onClick={() => toggleStep(idx)}>
+                    <span className="rd-step-num">{stepsChecked[idx] ? '✓' : idx + 1}</span>
                     <p className="rd-step-text">{step}</p>
                   </li>
                 ))}
