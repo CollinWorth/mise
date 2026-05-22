@@ -42,7 +42,9 @@ function EditRecipe({ user }) {
   const [tagSuggestions, setTagSuggestions]           = useState(BASE_TAGS);
   const stepRefs = useRef([]);
   const dragIdx  = useRef(null);
+  const fileRef  = useRef(null);
   const [dragOver, setDragOver] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const autoResize = el => {
     if (!el) return;
@@ -89,6 +91,28 @@ function EditRecipe({ user }) {
   }, [loading]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    const token = localStorage.getItem('mise_token');
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/recipes/upload-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (res.ok) {
+        const { url } = await res.json();
+        setForm(f => ({ ...f, image_url: url }));
+      }
+    } catch {}
+    setUploading(false);
+    e.target.value = '';
+  };
 
   const handleStepDragStart = useCallback((idx) => { dragIdx.current = idx; }, []);
   const handleStepDragOver  = useCallback((e, idx) => { e.preventDefault(); setDragOver(idx); }, []);
@@ -187,9 +211,15 @@ function EditRecipe({ user }) {
               placeholder="Type a tag…"
             />
           </div>
-          <label>
-            Image URL
-            <input type="text" name="image_url" value={form.image_url} onChange={handleChange} />
+          <label className="full-width">
+            Image
+            <div className="ar-image-row">
+              <input type="url" name="image_url" value={form.image_url} onChange={handleChange} placeholder="https://…" />
+              <button type="button" className="ar-upload-btn" onClick={() => fileRef.current.click()} disabled={uploading}>
+                {uploading ? '…' : '↑ Upload'}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleImageUpload} />
+            </div>
           </label>
           <div className="ar-toggle-row full-width">
             <div>
