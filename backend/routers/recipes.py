@@ -1033,8 +1033,7 @@ async def upload_image(request: Request, file: UploadFile = File(...), _: str = 
     os.makedirs("uploads", exist_ok=True)
     with open(f"uploads/{filename}", "wb") as f:
         f.write(await file.read())
-    base_url = str(request.base_url).rstrip("/")
-    return {"url": f"{base_url}/uploads/{filename}"}
+    return {"url": f"{_public_base_url(request)}/uploads/{filename}"}
 
 
 @router.post("/{recipe_id}/{selected_day}/{user_id}")

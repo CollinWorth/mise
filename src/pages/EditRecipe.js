@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { apiFetch } from '../api';
+import { apiFetch, imgUrl } from '../api';
 import ComboBox from '../components/ComboBox';
 import './css/AddRecipePage.css';
 
@@ -225,6 +225,7 @@ function EditRecipe({ user }) {
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleImageUpload} />
             </div>
+            {form.image_url && <img src={imgUrl(form.image_url)} alt="preview" className="ar-img-preview" />}
           </label>
           <div className="ar-toggle-row full-width">
             <div>
