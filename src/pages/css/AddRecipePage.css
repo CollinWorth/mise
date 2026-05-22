@@ -372,6 +372,34 @@
 .ar-step-row:hover .ar-drag-handle { opacity: 1; }
 .ar-step-row--drag-over { border-top: 2px solid var(--accent); padding-top: var(--space-2); }
 
+.ar-step-arrows {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.ar-step-arrow {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  touch-action: manipulation;
+  transition: background var(--transition), color var(--transition);
+}
+.ar-step-arrow:disabled { opacity: 0.3; cursor: default; }
+.ar-step-arrow:not(:disabled):active { background: var(--surface-raised); color: var(--accent); }
+
+@media (hover: none) {
+  .ar-drag-handle { display: none; }
+  .ar-step-arrows { display: flex; }
+}
+
 .btn-add-ingredient {
   background: none;
   border: 1.5px dashed var(--border);

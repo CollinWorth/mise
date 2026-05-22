@@ -361,6 +361,12 @@ export default function AddRecipe({ user }) {
                       onDragEnd={() => { dragIdx.current = null; setDragOver(null); }}
                     >
                       <span className="ar-drag-handle">⠿</span>
+                      <div className="ar-step-arrows">
+                        <button type="button" className="ar-step-arrow" disabled={idx === 0}
+                          onClick={() => { const n=[...steps]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; setSteps(n); }}>▲</button>
+                        <button type="button" className="ar-step-arrow" disabled={idx === steps.length - 1}
+                          onClick={() => { const n=[...steps]; [n[idx],n[idx+1]]=[n[idx+1],n[idx]]; setSteps(n); }}>▼</button>
+                      </div>
                       <span className="ar-step-num">{idx + 1}</span>
                       <textarea
                         className="ar-step-input"

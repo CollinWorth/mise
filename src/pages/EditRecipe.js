@@ -269,6 +269,12 @@ function EditRecipe({ user }) {
                   onDragEnd={() => { dragIdx.current = null; setDragOver(null); }}
                 >
                   <span className="ar-drag-handle">⠿</span>
+                  <div className="ar-step-arrows">
+                    <button type="button" className="ar-step-arrow" disabled={idx === 0}
+                      onClick={() => setSteps(s => { const n=[...s]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; })}>▲</button>
+                    <button type="button" className="ar-step-arrow" disabled={idx === steps.length - 1}
+                      onClick={() => setSteps(s => { const n=[...s]; [n[idx],n[idx+1]]=[n[idx+1],n[idx]]; return n; })}>▼</button>
+                  </div>
                   <span className="ar-step-num">{idx + 1}</span>
                   <textarea
                     className="ar-step-input"
