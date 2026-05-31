@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
 import StarRating from '../components/StarRating';
@@ -39,9 +39,11 @@ export default function Recipes({ user }) {
   const [activeTags, setActiveTags]     = useState(new Set());
   const [loading, setLoading]           = useState(true);
   const [sort, setSort]                 = useState('default');
+  const [sortOpen, setSortOpen]         = useState(false);
   const [failedImages, setFailedImages] = useState(new Set());
   const navigate  = useNavigate();
   const location  = useLocation();
+  const sortRef   = useRef(null);
 
   const goToRecipe = (id) => {
     sessionStorage.setItem('recipes_scrollY', String(window.scrollY));
@@ -64,6 +66,13 @@ export default function Recipes({ user }) {
       .then(data => { setRecipes(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    if (!sortOpen) return;
+    const handler = (e) => { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [sortOpen]);
 
   if (!user) {
     return (
@@ -155,8 +164,8 @@ export default function Recipes({ user }) {
         )}
       </div>
 
-      {/* ── Toolbar ─────────────────────────────────────── */}
-      <div className="recipes-toolbar">
+      {/* ── Controls ────────────────────────────────────── */}
+      <div className="recipes-controls">
         <div className="recipes-search-wrap">
           <svg className="recipes-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
             <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -169,26 +178,57 @@ export default function Recipes({ user }) {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          {search && (
+            <button className="recipes-search-clear" onClick={() => setSearch('')} aria-label="Clear search">✕</button>
+          )}
         </div>
-        <select className="recipes-sort-select" value={sort} onChange={e => setSort(e.target.value)}>
-          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
 
-      {/* ── Filter bar ──────────────────────────────────── */}
-      {(cuisines.length > 1 || allTags.length > 0) && (
-        <div className="recipes-filter-bar">
-          <div className="recipes-filter-chips">
-            {cuisines.slice(1).map(c => (
-              <button key={c} className={`filter-chip${activeCuisine === c ? ' filter-chip--active' : ''}`} onClick={() => setActiveCuisine(activeCuisine === c ? 'All' : c)}>{c}</button>
-            ))}
-            {allTags.slice(0, 8).map(t => (
-              <button key={t} className={`filter-chip${activeTags.has(t) ? ' filter-chip--active' : ''}`} onClick={() => toggleTag(t)}>#{t}</button>
-            ))}
-            {hasFilters && <button className="filter-chip filter-chip--clear" onClick={clearFilters}>✕ Clear</button>}
+        <div className="recipes-chips-row">
+          <div className="recipes-sort-wrap" ref={sortRef}>
+            <button
+              className={`filter-chip recipes-sort-pill${sortOpen ? ' filter-chip--active' : ''}`}
+              onClick={() => setSortOpen(o => !o)}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+                <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              {SORT_OPTIONS.find(o => o.value === sort)?.label}
+              <svg className={`sort-chevron${sortOpen ? ' sort-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {sortOpen && (
+              <div className="sort-dropdown">
+                {SORT_OPTIONS.map(o => (
+                  <button
+                    key={o.value}
+                    className={`sort-dropdown-item${sort === o.value ? ' sort-dropdown-item--active' : ''}`}
+                    onClick={() => { setSort(o.value); setSortOpen(false); }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {(cuisines.length > 1 || allTags.length > 0) && (
+            <div className="recipes-chips-divider" />
+          )}
+
+          {cuisines.slice(1).map(c => (
+            <button key={c} className={`filter-chip${activeCuisine === c ? ' filter-chip--active' : ''}`}
+              onClick={() => setActiveCuisine(activeCuisine === c ? 'All' : c)}>{c}</button>
+          ))}
+          {allTags.slice(0, 8).map(t => (
+            <button key={t} className={`filter-chip${activeTags.has(t) ? ' filter-chip--active' : ''}`}
+              onClick={() => toggleTag(t)}>#{t}</button>
+          ))}
+          {hasFilters && (
+            <button className="filter-chip filter-chip--clear" onClick={clearFilters}>✕ Clear</button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ── Content ─────────────────────────────────────── */}
       {loading ? (
