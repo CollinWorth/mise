@@ -126,10 +126,6 @@ export default function Recipes({ user }) {
     return list;
   })();
 
-  // Hero: first filtered recipe with an image
-  const hero = filtered.find(r => r.image_url && !failedImages.has(r._id || r.id));
-  const gridRecipes = hero ? filtered.filter(r => (r._id || r.id) !== (hero._id || hero.id)) : filtered;
-
   const firstName = user?.name?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -228,31 +224,8 @@ export default function Recipes({ user }) {
 
       ) : (
         <>
-          {/* Hero card */}
-          {hero && !hasFilters && sort === 'default' && (
-            <div className="recipe-hero" onClick={() => goToRecipe(hero._id || hero.id)}>
-              <div className="recipe-hero-img">
-                <img src={imgUrl(hero.image_url)} alt={hero.recipe_name}
-                  onError={() => setFailedImages(prev => new Set(prev).add(hero._id || hero.id))} />
-              </div>
-              <div className="recipe-hero-overlay">
-                <div className="recipe-hero-meta">
-                  {hero.category && <span className="recipe-overlay-badge">{hero.category}</span>}
-                  {hero.cuisine  && <span className="recipe-overlay-badge">{hero.cuisine}</span>}
-                  {totalTime(hero) && <span className="recipe-overlay-time">{totalTime(hero)}</span>}
-                </div>
-                <h2 className="recipe-hero-title">{hero.recipe_name}</h2>
-                {hero.servings && <p className="recipe-hero-sub">Serves {hero.servings}</p>}
-                <div className="recipe-hero-rating">
-                  <StarRating rating={hero.avg_rating || 0} showScore={hero.avg_rating > 0} size="sm" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Grid */}
           <div className="recipe-grid">
-            {(hero && !hasFilters && sort === 'default' ? gridRecipes : filtered).map((recipe, idx) => {
+            {filtered.map((recipe, idx) => {
               const rid = recipe._id || recipe.id || idx;
               const hasImage = recipe.image_url && !failedImages.has(rid);
               return (
