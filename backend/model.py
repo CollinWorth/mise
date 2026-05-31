@@ -32,6 +32,7 @@ class Recipe(BaseModel):
 class GroceryItem(BaseModel):
     name: str
     quantity: str
+    unit: str = ""
     category: str
     checked: bool = False
 
