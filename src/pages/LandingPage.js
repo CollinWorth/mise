@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { imgUrl } from '../api';
 import './css/LandingPage.css';
 
@@ -33,7 +33,6 @@ const STEPS = [
 ];
 
 export default function LandingPage() {
-  const navigate = useNavigate();
   const [featured, setFeatured] = useState([]);
 
   useEffect(() => {
