@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
-import StarRating from '../components/StarRating';
 import './css/ExplorePage.css';
 import './css/FeedPage.css';
 
@@ -269,9 +268,14 @@ export default function DiscoverPage({ user }) {
                       }
                     </div>
                     <div className="feed-post-actions">
-                      <div className="feed-action-btn feed-star-display">
-                        <StarRating rating={recipe.avg_rating || 0} showScore size="sm" />
-                      </div>
+                      {recipe.avg_rating > 0 && (
+                        <div className="feed-action-btn feed-star-display">
+                          <span className="ex-rating-badge">
+                            <span className="ex-rating-star">★</span>
+                            {recipe.avg_rating.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
                       <button className="feed-action-btn" onClick={() => goToRecipe(id)}>
                         <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
                           <path d="M14 10C14 10.5523 13.5523 11 13 11H4.5L2 13.5V3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10Z"
@@ -511,7 +515,12 @@ export default function DiscoverPage({ user }) {
                           <span className="ex-card-author-name">{recipe.author_name}</span>
                         </a>
                       )}
-                      <StarRating rating={recipe.avg_rating || 0} showScore size="sm" />
+                      {recipe.avg_rating > 0 && (
+                        <span className="ex-rating-badge">
+                          <span className="ex-rating-star">★</span>
+                          {recipe.avg_rating.toFixed(1)}
+                        </span>
+                      )}
                       <button className={`ex-save-btn${saved ? ' ex-save-btn--saved' : ''}`}
                         onClick={e => handleSave(e, id)} disabled={savingId === id}>
                         {savingId === id ? '…' : saved ? '✓ Saved' : '+ Save'}
