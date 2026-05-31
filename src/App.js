@@ -22,6 +22,7 @@ import UserProfilePage from './pages/UserProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import CookMode from './pages/CookMode';
 import NotFoundPage from './pages/NotFoundPage';
+import LandingPage from './pages/LandingPage';
 
 function App() {
   const [user, setUser] = useState(getStoredUser);
@@ -48,7 +49,7 @@ function App() {
       <div className="App">
         <NavBar user={user} onLogout={handleLogout} />
         <Routes>
-          <Route path="/" element={user ? <Recipes user={user} /> : <Navigate to="/discover" replace />} />
+          <Route path="/" element={user ? <Recipes user={user} /> : <LandingPage />} />
           <Route path="/calendar" element={<Calendar user={user} />} />
           <Route path="/recipes" element={user ? <Recipes user={user} /> : <Navigate to="/discover" replace />} />
           <Route path="/recipes/add" element={<AddRecipe user={user} />} />
