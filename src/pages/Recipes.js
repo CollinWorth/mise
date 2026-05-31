@@ -5,26 +5,18 @@ import StarRating from '../components/StarRating';
 import './css/Recipes.css';
 
 const SORT_OPTIONS = [
-  { value: 'default',    label: 'Default' },
-  { value: 'top-rated',  label: '★ Top rated' },
-  { value: 'az',         label: 'A → Z' },
-  { value: 'za',         label: 'Z → A' },
-  { value: 'quickest',   label: 'Quickest' },
-  { value: 'fewest',     label: 'Fewest ingredients' },
+  { value: 'default',   label: 'Newest first' },
+  { value: 'top-rated', label: '★ Top rated' },
+  { value: 'az',        label: 'A → Z' },
+  { value: 'za',        label: 'Z → A' },
+  { value: 'quickest',  label: 'Quickest' },
+  { value: 'fewest',    label: 'Fewest ingredients' },
 ];
 
 const CUISINE_BG = {
-  italian:       '#F5EDE8',
-  mexican:       '#E9F2E9',
-  japanese:      '#F2EDF4',
-  chinese:       '#F5EDEC',
-  indian:        '#F5F0E8',
-  american:      '#EBF0F5',
-  french:        '#EEF0F8',
-  thai:          '#F3F2E7',
-  mediterranean: '#E8F2EF',
-  greek:         '#EDF0F8',
-  korean:        '#F4EDF2',
+  italian:'#F5EDE8', mexican:'#E9F2E9', japanese:'#F2EDF4', chinese:'#F5EDEC',
+  indian:'#F5F0E8', american:'#EBF0F5', french:'#EEF0F8', thai:'#F3F2E7',
+  mediterranean:'#E8F2EF', greek:'#EDF0F8', korean:'#F4EDF2',
 };
 const cuisineBg = c => (c && CUISINE_BG[c.toLowerCase()]) || '#F2F0EB';
 
@@ -33,16 +25,23 @@ function totalTime(recipe) {
   return t > 0 ? `${t}m` : null;
 }
 
+const IMPORT_METHODS = [
+  { icon: '🔗', label: 'From URL',    desc: 'Any recipe website',   path: '/recipes/add' },
+  { icon: '🎵', label: 'From TikTok', desc: 'Paste a TikTok link',  path: '/recipes/add' },
+  { icon: '📋', label: 'Paste text',  desc: 'Copy from anywhere',   path: '/recipes/add' },
+  { icon: '✍️', label: 'Manually',    desc: 'Type it yourself',     path: '/recipes/add' },
+];
+
 export default function Recipes({ user }) {
-  const [recipes, setRecipes] = useState([]);
-  const [search, setSearch] = useState('');
+  const [recipes, setRecipes]           = useState([]);
+  const [search, setSearch]             = useState('');
   const [activeCuisine, setActiveCuisine] = useState('All');
-  const [activeTags, setActiveTags] = useState(new Set());
-  const [loading, setLoading] = useState(true);
-  const [sort, setSort] = useState('default');
+  const [activeTags, setActiveTags]     = useState(new Set());
+  const [loading, setLoading]           = useState(true);
+  const [sort, setSort]                 = useState('default');
   const [failedImages, setFailedImages] = useState(new Set());
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
   const goToRecipe = (id) => {
     sessionStorage.setItem('recipes_scrollY', String(window.scrollY));
@@ -82,8 +81,8 @@ export default function Recipes({ user }) {
   }
 
   const cuisines = ['All', ...Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean)))];
+  const categorySet = new Set(recipes.map(r => r.category).filter(Boolean));
 
-  // Collect all tags sorted by frequency
   const allTags = (() => {
     const freq = {};
     recipes.forEach(r => {
@@ -117,131 +116,155 @@ export default function Recipes({ user }) {
       return matchSearch && matchCuisine && matchTags;
     });
     if (sort === 'top-rated') list = [...list].sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
-    else if (sort === 'az') list = [...list].sort((a, b) => a.recipe_name.localeCompare(b.recipe_name));
-    else if (sort === 'za') list = [...list].sort((a, b) => b.recipe_name.localeCompare(a.recipe_name));
+    else if (sort === 'az')   list = [...list].sort((a, b) => a.recipe_name.localeCompare(b.recipe_name));
+    else if (sort === 'za')   list = [...list].sort((a, b) => b.recipe_name.localeCompare(a.recipe_name));
     else if (sort === 'quickest') list = [...list].sort((a, b) => {
-      const ta = (a.prep_time || 0) + (a.cook_time || 0);
-      const tb = (b.prep_time || 0) + (b.cook_time || 0);
-      if (!ta && !tb) return 0;
-      if (!ta) return 1;
-      if (!tb) return -1;
-      return ta - tb;
+      const ta = (a.prep_time||0)+(a.cook_time||0), tb = (b.prep_time||0)+(b.cook_time||0);
+      if (!ta && !tb) return 0; if (!ta) return 1; if (!tb) return -1; return ta - tb;
     });
-    else if (sort === 'fewest') list = [...list].sort((a, b) =>
-      (a.ingredients?.length || 0) - (b.ingredients?.length || 0));
+    else if (sort === 'fewest') list = [...list].sort((a, b) => (a.ingredients?.length||0)-(b.ingredients?.length||0));
     return list;
   })();
 
-  // const [featured, ...rest] = filtered;
+  // Hero: first filtered recipe with an image
+  const hero = filtered.find(r => r.image_url && !failedImages.has(r._id || r.id));
+  const gridRecipes = hero ? filtered.filter(r => (r._id || r.id) !== (hero._id || hero.id)) : filtered;
+
+  const firstName = user?.name?.split(' ')[0] || 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
     <div className="recipes-page">
 
-      {/* Toolbar */}
-      <div className="recipes-toolbar">
-        <div className="recipes-toolbar-left">
-          <h1>Recipes</h1>
-          {!loading && recipes.length > 0 && (
-            <span className="recipes-count">
-              {hasFilters && filtered.length !== recipes.length ? `${filtered.length} / ` : ''}{recipes.length}
-            </span>
-          )}
-        </div>
-        <div className="recipes-toolbar-right">
-          <input
-            type="search"
-            className="recipes-search-input"
-            placeholder="Search recipes..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <select
-            className="recipes-sort-select"
-            value={sort}
-            onChange={e => setSort(e.target.value)}
-            aria-label="Sort recipes"
-          >
-            {SORT_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <button className="btn-primary" onClick={() => navigate('/recipes/add')}>
+      {/* ── Header ──────────────────────────────────────── */}
+      <div className="recipes-header">
+        <div className="recipes-header-top">
+          <div>
+            <p className="recipes-greeting">{greeting}, {firstName}</p>
+            <h1 className="recipes-title">My Recipes</h1>
+          </div>
+          <button className="btn-primary recipes-add-btn" onClick={() => navigate('/recipes/add')}>
             + Add Recipe
           </button>
         </div>
+
+        {!loading && recipes.length > 0 && (
+          <div className="recipes-stats">
+            <span className="recipes-stat">{recipes.length} recipe{recipes.length !== 1 ? 's' : ''}</span>
+            {categorySet.size > 0 && <><span className="recipes-stat-dot">·</span><span className="recipes-stat">{categorySet.size} categor{categorySet.size !== 1 ? 'ies' : 'y'}</span></>}
+            {cuisines.length > 2 && <><span className="recipes-stat-dot">·</span><span className="recipes-stat">{cuisines.length - 1} cuisine{cuisines.length > 2 ? 's' : ''}</span></>}
+            {hasFilters && <><span className="recipes-stat-dot">·</span><span className="recipes-stat recipes-stat--filtered">{filtered.length} showing</span></>}
+          </div>
+        )}
       </div>
 
-      {/* Filter bar */}
+      {/* ── Toolbar ─────────────────────────────────────── */}
+      <div className="recipes-toolbar">
+        <div className="recipes-search-wrap">
+          <svg className="recipes-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <input
+            type="search"
+            className="recipes-search-input"
+            placeholder="Search your recipes…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <select className="recipes-sort-select" value={sort} onChange={e => setSort(e.target.value)}>
+          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* ── Filter bar ──────────────────────────────────── */}
       {(cuisines.length > 1 || allTags.length > 0) && (
         <div className="recipes-filter-bar">
-          {cuisines.length > 1 && (
-            <div className="recipes-filter-group">
-              <span className="recipes-filter-label">Cuisine</span>
-              <div className="recipes-filter-chips">
-                {cuisines.map(c => (
-                  <button key={c} className={`filter-chip${activeCuisine === c ? ' filter-chip--active' : ''}`} onClick={() => setActiveCuisine(c)}>{c}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {allTags.length > 0 && (
-            <div className="recipes-filter-group">
-              <span className="recipes-filter-label">Tags</span>
-              <div className="recipes-filter-chips">
-                {allTags.map(t => (
-                  <button key={t} className={`filter-chip${activeTags.has(t) ? ' filter-chip--active' : ''}`} onClick={() => toggleTag(t)}>#{t}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {hasFilters && (
-            <button className="recipes-clear-filters" onClick={clearFilters}>Clear filters</button>
-          )}
+          <div className="recipes-filter-chips">
+            {cuisines.slice(1).map(c => (
+              <button key={c} className={`filter-chip${activeCuisine === c ? ' filter-chip--active' : ''}`} onClick={() => setActiveCuisine(activeCuisine === c ? 'All' : c)}>{c}</button>
+            ))}
+            {allTags.slice(0, 8).map(t => (
+              <button key={t} className={`filter-chip${activeTags.has(t) ? ' filter-chip--active' : ''}`} onClick={() => toggleTag(t)}>#{t}</button>
+            ))}
+            {hasFilters && <button className="filter-chip filter-chip--clear" onClick={clearFilters}>✕ Clear</button>}
+          </div>
         </div>
       )}
 
-      {/* Content */}
+      {/* ── Content ─────────────────────────────────────── */}
       {loading ? (
         <div className="recipes-loading">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="skeleton-card" />
-          ))}
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton-card" />)}
         </div>
+
+      ) : recipes.length === 0 ? (
+        <div className="recipes-empty-start">
+          <div className="recipes-empty-heading">
+            <span className="recipes-empty-emoji">🍽</span>
+            <h2>Your cookbook is empty</h2>
+            <p>Add your first recipe to get started. Import from a website, TikTok, paste text, or type it yourself.</p>
+          </div>
+          <div className="recipes-import-cards">
+            {IMPORT_METHODS.map(m => (
+              <button key={m.label} className="recipes-import-card" onClick={() => navigate(m.path)}>
+                <span className="recipes-import-icon">{m.icon}</span>
+                <span className="recipes-import-label">{m.label}</span>
+                <span className="recipes-import-desc">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       ) : filtered.length === 0 ? (
         <div className="recipes-empty">
-          <p className="recipes-empty-icon">🍽</p>
-          <h3>{recipes.length === 0 ? 'No recipes yet' : 'No results'}</h3>
-          <p>{recipes.length === 0 ? 'Add your first recipe to get started.' : 'Try a different search or filter.'}</p>
-          {recipes.length === 0 && (
-            <button className="btn-primary" onClick={() => navigate('/recipes/add')}>+ Add your first recipe</button>
-          )}
+          <p className="recipes-empty-icon">🔍</p>
+          <h3>No results</h3>
+          <p>Try a different search or filter.</p>
+          <button className="btn-ghost" onClick={clearFilters}>Clear filters</button>
         </div>
+
       ) : (
-        /* Grid */
-        filtered.length > 0 && (
+        <>
+          {/* Hero card */}
+          {hero && !hasFilters && sort === 'default' && (
+            <div className="recipe-hero" onClick={() => goToRecipe(hero._id || hero.id)}>
+              <div className="recipe-hero-img">
+                <img src={imgUrl(hero.image_url)} alt={hero.recipe_name}
+                  onError={() => setFailedImages(prev => new Set(prev).add(hero._id || hero.id))} />
+              </div>
+              <div className="recipe-hero-overlay">
+                <div className="recipe-hero-meta">
+                  {hero.category && <span className="recipe-overlay-badge">{hero.category}</span>}
+                  {hero.cuisine  && <span className="recipe-overlay-badge">{hero.cuisine}</span>}
+                  {totalTime(hero) && <span className="recipe-overlay-time">{totalTime(hero)}</span>}
+                </div>
+                <h2 className="recipe-hero-title">{hero.recipe_name}</h2>
+                {hero.servings && <p className="recipe-hero-sub">Serves {hero.servings}</p>}
+                <div className="recipe-hero-rating">
+                  <StarRating rating={hero.avg_rating || 0} showScore={hero.avg_rating > 0} size="sm" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grid */}
           <div className="recipe-grid">
-            {filtered.map((recipe, idx) => {
+            {(hero && !hasFilters && sort === 'default' ? gridRecipes : filtered).map((recipe, idx) => {
               const rid = recipe._id || recipe.id || idx;
               const hasImage = recipe.image_url && !failedImages.has(rid);
               return (
-                <div
-                  key={rid}
-                  className={`recipe-card${hasImage ? '' : ' recipe-card--text'}`}
-                  onClick={() => goToRecipe(recipe._id || recipe.id)}
-                >
+                <div key={rid} className={`recipe-card${hasImage ? '' : ' recipe-card--text'}`}
+                  onClick={() => goToRecipe(recipe._id || recipe.id)}>
                   {hasImage ? (
                     <div className="recipe-card-img">
-                      <img
-                        src={imgUrl(recipe.image_url)}
-                        alt={recipe.recipe_name}
-                        onError={() => setFailedImages(prev => new Set(prev).add(rid))}
-                      />
+                      <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name}
+                        onError={() => setFailedImages(prev => new Set(prev).add(rid))} />
                       <div className="recipe-card-overlay">
                         <div className="recipe-card-tags">
                           {recipe.cuisine && <span className="recipe-overlay-badge">{recipe.cuisine}</span>}
-                          {recipe.tags && recipe.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 2).map(t => (
-                            <span key={t} className="recipe-overlay-badge recipe-overlay-tag">{t}</span>
-                          ))}
                           {totalTime(recipe) && <span className="recipe-overlay-time">{totalTime(recipe)}</span>}
                         </div>
                         <div className="recipe-card-title">{recipe.recipe_name}</div>
@@ -253,6 +276,7 @@ export default function Recipes({ user }) {
                     </div>
                   ) : (
                     <div className="recipe-card-text" style={{ background: cuisineBg(recipe.cuisine) }}>
+                      {recipe.category && <span className="recipe-card-text-category">{recipe.category}</span>}
                       <div className="recipe-card-title">{recipe.recipe_name}</div>
                       <div className="recipe-card-sub">
                         {[recipe.cuisine, totalTime(recipe), recipe.servings && `Serves ${recipe.servings}`]
@@ -267,7 +291,7 @@ export default function Recipes({ user }) {
               );
             })}
           </div>
-        )
+        </>
       )}
     </div>
   );

@@ -35,50 +35,44 @@ function avatarColor(name) {
 
 function peopleMeta(person) {
   const parts = [];
-  if (person.recipe_count > 0) parts.push(`${person.recipe_count} recipe${person.recipe_count !== 1 ? 's' : ''}`);
+  if (person.recipe_count  > 0) parts.push(`${person.recipe_count} recipe${person.recipe_count !== 1 ? 's' : ''}`);
   if (person.follower_count > 0) parts.push(`${person.follower_count} follower${person.follower_count !== 1 ? 's' : ''}`);
   return parts.join(' · ');
 }
 
-
 export default function DiscoverPage({ user }) {
-  const [tab, setTab] = useState('all'); // 'following' | explore filter tabs
+  const [tab, setTab] = useState('all');
 
-  // Shared save state
-  const [savedIds, setSavedIds] = useState(new Set());
-  const [savingId, setSavingId] = useState(null);
+  const [savedIds, setSavedIds]   = useState(new Set());
+  const [savingId, setSavingId]   = useState(null);
 
-  // Explore state
   const [exploreRecipes, setExploreRecipes] = useState([]);
   const [exploreLoading, setExploreLoading] = useState(true);
   const [failedImages, setFailedImages]     = useState(new Set());
   const [search, setSearch]                 = useState('');
   const [activeFilter, setActiveFilter]     = useState('all');
 
-  // Feed state
   const [feedRecipes, setFeedRecipes]   = useState([]);
   const [feedLoading, setFeedLoading]   = useState(false);
   const [feedLoaded, setFeedLoaded]     = useState(false);
 
-  // People state
-  const [peopleSearch, setPeopleSearch] = useState('');
-  const [people, setPeople]             = useState([]);
-  const [peopleLoading, setPeopleLoading] = useState(false);
-  const [followedIds, setFollowedIds]   = useState(new Set());
-  const [suggestedPeople, setSuggestedPeople] = useState([]);
+  const [peopleSearch, setPeopleSearch]     = useState('');
+  const [people, setPeople]                 = useState([]);
+  const [peopleLoading, setPeopleLoading]   = useState(false);
+  const [followedIds, setFollowedIds]       = useState(new Set());
+  const [suggestedPeople, setSuggestedPeople]   = useState([]);
   const [suggestedLoading, setSuggestedLoading] = useState(false);
   const [suggestedLoaded, setSuggestedLoaded]   = useState(false);
   const peopleTimer = useRef(null);
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
   const goToRecipe = (id) => {
     sessionStorage.setItem('discover_scrollY', String(window.scrollY));
     navigate(`/recipes/${id}`, { state: { from: location.pathname } });
   };
 
-  // Restore scroll when returning from a recipe
   useEffect(() => {
     const saved = sessionStorage.getItem('discover_scrollY');
     if (saved) {
@@ -87,18 +81,13 @@ export default function DiscoverPage({ user }) {
     }
   }, []);
 
-  // Load explore recipes on mount
   useEffect(() => {
     apiFetch('/recipes/explore')
       .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        setExploreRecipes(data);
-        setExploreLoading(false);
-      })
+      .then(data => { setExploreRecipes(data); setExploreLoading(false); })
       .catch(() => setExploreLoading(false));
   }, []);
 
-  // Load suggested people + following list when People tab first opens
   useEffect(() => {
     if (tab !== 'people' || suggestedLoaded) return;
     setSuggestedLoading(true);
@@ -116,7 +105,6 @@ export default function DiscoverPage({ user }) {
       .catch(() => setSuggestedLoading(false));
   }, [tab, user, suggestedLoaded]);
 
-  // Debounced people search
   useEffect(() => {
     if (tab !== 'people') return;
     clearTimeout(peopleTimer.current);
@@ -135,33 +123,20 @@ export default function DiscoverPage({ user }) {
     e.stopPropagation();
     if (!user) { navigate('/login'); return; }
     const alreadyFollowing = followedIds.has(targetId);
-    setFollowedIds(prev => {
-      const next = new Set(prev);
-      alreadyFollowing ? next.delete(targetId) : next.add(targetId);
-      return next;
-    });
+    setFollowedIds(prev => { const n = new Set(prev); alreadyFollowing ? n.delete(targetId) : n.add(targetId); return n; });
     try {
       await apiFetch(`/follows/${targetId}`, { method: alreadyFollowing ? 'DELETE' : 'POST', body: '{}' });
     } catch {
-      setFollowedIds(prev => {
-        const next = new Set(prev);
-        alreadyFollowing ? next.add(targetId) : next.delete(targetId);
-        return next;
-      });
+      setFollowedIds(prev => { const n = new Set(prev); alreadyFollowing ? n.add(targetId) : n.delete(targetId); return n; });
     }
   };
 
-  // Load feed when switching to 'following' tab
   useEffect(() => {
     if (tab !== 'following' || !user || feedLoaded) return;
     setFeedLoading(true);
     apiFetch('/recipes/feed')
       .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        setFeedRecipes(data);
-        setFeedLoading(false);
-        setFeedLoaded(true);
-      })
+      .then(data => { setFeedRecipes(data); setFeedLoading(false); setFeedLoaded(true); })
       .catch(() => setFeedLoading(false));
   }, [tab, user, feedLoaded]);
 
@@ -177,7 +152,6 @@ export default function DiscoverPage({ user }) {
     setSavingId(null);
   };
 
-  // Build explore filter tabs
   const cuisineSet  = new Set(exploreRecipes.map(r => r.cuisine).filter(Boolean));
   const categorySet = new Set(exploreRecipes.map(r => r.category).filter(Boolean));
   const dynamicTabs = [
@@ -186,7 +160,6 @@ export default function DiscoverPage({ user }) {
   ];
   const filterTabs = [...STATIC_TABS, ...dynamicTabs];
 
-  // Apply explore filter + search
   let filtered = [...exploreRecipes];
   if (activeFilter === 'trending') {
     filtered.sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
@@ -208,67 +181,49 @@ export default function DiscoverPage({ user }) {
     );
   }
 
-  const showingFeed = tab === 'following';
+  // Spotlight: 3 newest recipes with images, only shown on default All view
+  const spotlight = exploreRecipes
+    .filter(r => r.image_url && !failedImages.has(r._id || r.id))
+    .slice(0, 3);
+
+  const showingFeed    = tab === 'following';
+  const showingExplore = !showingFeed && tab !== 'people';
+  const showSpotlight  = showingExplore && activeFilter === 'all' && !search.trim() && spotlight.length >= 2;
 
   return (
     <div className="ex-page">
 
-      {/* ── Header ─────────────────────────────────────── */}
+      {/* ── Sticky header ──────────────────────────────── */}
       <div className={`ex-header${tab === 'people' ? ' ex-header--people' : ''}`}>
         <div className="ex-header-top">
-          {/* Mode toggle */}
           <div className="discover-mode-toggle">
             {user && (
-              <button
-                className={`discover-mode-btn${showingFeed ? ' discover-mode-btn--active' : ''}`}
-                onClick={() => setTab('following')}
-              >
-                Following
-              </button>
+              <button className={`discover-mode-btn${showingFeed ? ' discover-mode-btn--active' : ''}`}
+                onClick={() => setTab('following')}>Following</button>
             )}
-            <button
-              className={`discover-mode-btn${!showingFeed && tab !== 'people' ? ' discover-mode-btn--active' : ''}`}
-              onClick={() => { setTab('all'); setActiveFilter('all'); }}
-            >
-              Discover
-            </button>
-            <button
-              className={`discover-mode-btn${tab === 'people' ? ' discover-mode-btn--active' : ''}`}
-              onClick={() => setTab('people')}
-            >
-              People
-            </button>
+            <button className={`discover-mode-btn${showingExplore ? ' discover-mode-btn--active' : ''}`}
+              onClick={() => { setTab('all'); setActiveFilter('all'); }}>Discover</button>
+            <button className={`discover-mode-btn${tab === 'people' ? ' discover-mode-btn--active' : ''}`}
+              onClick={() => setTab('people')}>People</button>
           </div>
 
-          {/* Search — recipes (explore) only; people search lives inside its section */}
-          {(!showingFeed && tab !== 'people') && (
+          {showingExplore && (
             <div className="ex-search-wrap">
               <svg className="ex-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
                 <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              <input
-                className="ex-search"
-                type="search"
-                placeholder="Search recipes…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+              <input className="ex-search" type="search" placeholder="Search recipes…"
+                value={search} onChange={e => setSearch(e.target.value)} />
             </div>
           )}
         </div>
 
-        {/* Filter tabs (explore only) */}
-        {!showingFeed && tab !== 'people' && (
+        {showingExplore && (
           <div className="ex-tabs">
             {filterTabs.map(t => (
-              <button
-                key={t.id}
-                className={`ex-tab${activeFilter === t.id ? ' ex-tab--active' : ''}`}
-                onClick={() => setActiveFilter(t.id)}
-              >
-                {t.label}
-              </button>
+              <button key={t.id} className={`ex-tab${activeFilter === t.id ? ' ex-tab--active' : ''}`}
+                onClick={() => setActiveFilter(t.id)}>{t.label}</button>
             ))}
           </div>
         )}
@@ -278,9 +233,7 @@ export default function DiscoverPage({ user }) {
       {showingFeed && (
         <div className="feed-inner">
           {feedLoading ? (
-            <div className="feed-skeletons">
-              {[0,1,2].map(i => <div key={i} className="feed-skeleton" />)}
-            </div>
+            <div className="feed-skeletons">{[0,1,2].map(i => <div key={i} className="feed-skeleton" />)}</div>
           ) : feedRecipes.length === 0 ? (
             <div className="feed-empty">
               <span className="feed-empty-icon">👨‍🍳</span>
@@ -326,7 +279,8 @@ export default function DiscoverPage({ user }) {
                         </svg>
                         {(recipe.comment_count || 0) > 0 && <span className="feed-action-count">{recipe.comment_count}</span>}
                       </button>
-                      <button className={`feed-action-btn feed-save-btn${saved ? ' feed-save-btn--saved' : ''}`} onClick={e => handleSave(e, id)} style={{marginLeft:'auto'}}>
+                      <button className={`feed-action-btn feed-save-btn${saved ? ' feed-save-btn--saved' : ''}`}
+                        onClick={e => handleSave(e, id)} style={{marginLeft:'auto'}}>
                         <svg width="20" height="22" viewBox="0 0 14 18" fill={saved ? 'currentColor' : 'none'}>
                           <path d="M1 1H13V17L7 13L1 17V1Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
                         </svg>
@@ -360,29 +314,18 @@ export default function DiscoverPage({ user }) {
       {/* ── People ─────────────────────────────────────── */}
       {tab === 'people' && (
         <div className="people-section">
-
-          {/* Search — lives here so it's flush with the list */}
           <div className="people-search-wrap">
             <svg className="people-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
               <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <input
-              className="people-search-input"
-              type="search"
-              placeholder="Search by name…"
-              value={peopleSearch}
-              onChange={e => setPeopleSearch(e.target.value)}
-              autoFocus
-            />
+            <input className="people-search-input" type="search" placeholder="Search by name…"
+              value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} autoFocus />
           </div>
 
-          {/* Results */}
           {!peopleSearch.trim() ? (
             suggestedLoading ? (
-              <div className="people-list">
-                {[0,1,2,3,4].map(i => <div key={i} className="people-skeleton" />)}
-              </div>
+              <div className="people-list">{[0,1,2,3,4].map(i => <div key={i} className="people-skeleton" />)}</div>
             ) : suggestedPeople.length === 0 ? (
               <div className="ex-empty">
                 <span className="ex-empty-icon">👤</span>
@@ -411,10 +354,8 @@ export default function DiscoverPage({ user }) {
                           <img className="people-card-thumb" src={imgUrl(person.sample_image)} alt="" loading="lazy" />
                         )}
                         {!isMe && user && (
-                          <button
-                            className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
-                            onClick={e => handleFollow(e, pid)}
-                          >
+                          <button className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
+                            onClick={e => handleFollow(e, pid)}>
                             {following ? 'Following' : 'Follow'}
                           </button>
                         )}
@@ -425,9 +366,7 @@ export default function DiscoverPage({ user }) {
               </>
             )
           ) : peopleLoading ? (
-            <div className="people-list">
-              {[0,1,2].map(i => <div key={i} className="people-skeleton" />)}
-            </div>
+            <div className="people-list">{[0,1,2].map(i => <div key={i} className="people-skeleton" />)}</div>
           ) : people.length === 0 ? (
             <div className="ex-empty">
               <span className="ex-empty-icon">🔍</span>
@@ -453,10 +392,8 @@ export default function DiscoverPage({ user }) {
                         {meta && <span className="people-card-meta">{meta}</span>}
                       </div>
                       {!isMe && user && (
-                        <button
-                          className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
-                          onClick={e => handleFollow(e, pid)}
-                        >
+                        <button className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
+                          onClick={e => handleFollow(e, pid)}>
                           {following ? 'Following' : 'Follow'}
                         </button>
                       )}
@@ -469,8 +406,8 @@ export default function DiscoverPage({ user }) {
         </div>
       )}
 
-      {/* ── Discover (Explore grid) ─────────────────────── */}
-      {!showingFeed && tab !== 'people' && (
+      {/* ── Discover ───────────────────────────────────── */}
+      {showingExplore && (
         exploreLoading ? (
           <div className="ex-grid">
             {Array.from({length: 8}).map((_, i) => <div key={i} className="ex-skeleton" />)}
@@ -480,62 +417,111 @@ export default function DiscoverPage({ user }) {
             <span className="ex-empty-icon">🌍</span>
             <h3>{exploreRecipes.length === 0 ? 'Nothing shared yet' : 'No results'}</h3>
             <p>{exploreRecipes.length === 0
-              ? "Open a recipe you own, toggle \"Share publicly\", and it'll appear here."
+              ? 'Open a recipe you own, toggle "Share publicly", and it\'ll appear here.'
               : 'Try a different search or category.'
             }</p>
           </div>
         ) : (
-          <div className="ex-grid">
-            {filtered.map(recipe => {
-              const id = recipe._id || recipe.id;
-              const saved = savedIds.has(id);
-              const time = fmtTime(recipe);
-              const hasImage = recipe.image_url && !failedImages.has(id);
-              return (
-                <article
-                  key={id}
-                  className={`ex-card${hasImage ? '' : ' ex-card--no-image'}`}
-                  style={hasImage ? {} : { background: cuisineBg(recipe.cuisine) }}
-                  onClick={() => goToRecipe(id)}
-                >
-                  {hasImage && (
-                    <div className="ex-card-img">
-                      <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
-                        onError={() => setFailedImages(prev => new Set(prev).add(id))} />
-                      {recipe.cuisine && <span className="ex-card-cuisine">{recipe.cuisine}</span>}
-                    </div>
-                  )}
-                  <div className="ex-card-body">
-                    <h3 className="ex-card-title">{recipe.recipe_name}</h3>
-                    <div className="ex-card-meta">
-                      {recipe.category && <span className="ex-card-tag ex-card-category">{recipe.category}</span>}
-                      {time && <><span className="ex-card-dot">·</span><span>{time}</span></>}
-                      {recipe.servings && <><span className="ex-card-dot">·</span><span>Serves {recipe.servings}</span></>}
-                      {recipe.tags && recipe.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0,1).map(t => (
-                        <span key={t} className="ex-card-tag">{t}</span>
-                      ))}
-                    </div>
-                    {recipe.is_modified && recipe.original_author_name && (
-                      <div className="ex-card-remix">↪ modified from {recipe.original_author_name}</div>
+          <>
+            {/* Spotlight row */}
+            {showSpotlight && (
+              <div className="ex-spotlight">
+                <div className="ex-spotlight-label">
+                  <span>Recently added</span>
+                  <button className="ex-spotlight-see-all" onClick={() => setActiveFilter('new')}>See all →</button>
+                </div>
+                <div className="ex-spotlight-row">
+                  {spotlight.map(recipe => {
+                    const id = recipe._id || recipe.id;
+                    const saved = savedIds.has(id);
+                    return (
+                      <div key={id} className="ex-spotlight-card" onClick={() => goToRecipe(id)}>
+                        <div className="ex-spotlight-img">
+                          <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
+                            onError={() => setFailedImages(prev => new Set(prev).add(id))} />
+                          <button className={`ex-spotlight-save${saved ? ' ex-spotlight-save--saved' : ''}`}
+                            onClick={e => handleSave(e, id)} disabled={savingId === id}>
+                            <svg width="14" height="16" viewBox="0 0 14 18" fill={saved ? 'currentColor' : 'none'}>
+                              <path d="M1 1H13V17L7 13L1 17V1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="ex-spotlight-body">
+                          {recipe.category && <span className="ex-spotlight-tag">{recipe.category}</span>}
+                          <div className="ex-spotlight-title">{recipe.recipe_name}</div>
+                          <div className="ex-spotlight-meta">
+                            {recipe.author_name && (
+                              <span className="ex-spotlight-author">
+                                <span className="ex-spotlight-avatar" style={{background: avatarColor(recipe.author_name)}}>
+                                  {recipe.author_name[0].toUpperCase()}
+                                </span>
+                                {recipe.author_name}
+                              </span>
+                            )}
+                            {fmtTime(recipe) && <span className="ex-spotlight-time">{fmtTime(recipe)}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Main grid */}
+            {showSpotlight && (
+              <div className="ex-grid-label">
+                <span>All recipes</span>
+                <span className="ex-grid-count">{filtered.length}</span>
+              </div>
+            )}
+            <div className="ex-grid">
+              {filtered.map(recipe => {
+                const id = recipe._id || recipe.id;
+                const saved = savedIds.has(id);
+                const time = fmtTime(recipe);
+                const hasImage = recipe.image_url && !failedImages.has(id);
+                return (
+                  <article key={id}
+                    className={`ex-card${hasImage ? '' : ' ex-card--no-image'}`}
+                    style={hasImage ? {} : { background: cuisineBg(recipe.cuisine) }}
+                    onClick={() => goToRecipe(id)}>
+                    {hasImage && (
+                      <div className="ex-card-img">
+                        <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
+                          onError={() => setFailedImages(prev => new Set(prev).add(id))} />
+                        {recipe.cuisine && <span className="ex-card-cuisine">{recipe.cuisine}</span>}
+                      </div>
                     )}
-                  </div>
-                  <div className="ex-card-footer" onClick={e => e.stopPropagation()}>
-                    {recipe.author_name && (
-                      <a href={`/users/${recipe.user_id}`} className="ex-card-author"
-                        onClick={e => { e.stopPropagation(); e.preventDefault(); navigate(`/users/${recipe.user_id}`); }}>
-                        <span className="ex-card-author-avatar">{recipe.author_name[0].toUpperCase()}</span>
-                        <span className="ex-card-author-name">{recipe.author_name}</span>
-                      </a>
-                    )}
-                    <StarRating rating={recipe.avg_rating || 0} showScore size="sm" />
-                    <button className={`ex-save-btn${saved ? ' ex-save-btn--saved' : ''}`} onClick={e => handleSave(e, id)} disabled={savingId === id}>
-                      {savingId === id ? '…' : saved ? '✓ Saved' : '+ Save'}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                    <div className="ex-card-body">
+                      <h3 className="ex-card-title">{recipe.recipe_name}</h3>
+                      <div className="ex-card-meta">
+                        {recipe.category && <span className="ex-card-tag ex-card-category">{recipe.category}</span>}
+                        {time && <><span className="ex-card-dot">·</span><span>{time}</span></>}
+                        {recipe.servings && <><span className="ex-card-dot">·</span><span>Serves {recipe.servings}</span></>}
+                      </div>
+                    </div>
+                    <div className="ex-card-footer" onClick={e => e.stopPropagation()}>
+                      {recipe.author_name && (
+                        <a href={`/users/${recipe.user_id}`} className="ex-card-author"
+                          onClick={e => { e.stopPropagation(); e.preventDefault(); navigate(`/users/${recipe.user_id}`); }}>
+                          <span className="ex-card-author-avatar" style={{background: avatarColor(recipe.author_name)}}>
+                            {recipe.author_name[0].toUpperCase()}
+                          </span>
+                          <span className="ex-card-author-name">{recipe.author_name}</span>
+                        </a>
+                      )}
+                      <StarRating rating={recipe.avg_rating || 0} showScore size="sm" />
+                      <button className={`ex-save-btn${saved ? ' ex-save-btn--saved' : ''}`}
+                        onClick={e => handleSave(e, id)} disabled={savingId === id}>
+                        {savingId === id ? '…' : saved ? '✓ Saved' : '+ Save'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )
       )}
     </div>
