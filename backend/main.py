@@ -40,12 +40,12 @@ async def startup_db_client():
     try:
         await client.admin.command('ping')
         print("MongoDB connection successful")
+        from database import ratings_collection
+        await ratings_collection.create_index(
+            [("recipe_id", 1), ("user_id", 1)], unique=True
+        )
     except Exception as e:
-        print(f"MongoDB connection failed: {e}")
-    from database import ratings_collection
-    await ratings_collection.create_index(
-        [("recipe_id", 1), ("user_id", 1)], unique=True
-    )
+        print(f"MongoDB startup error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
