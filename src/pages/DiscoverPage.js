@@ -11,11 +11,10 @@ const CUISINE_BG = {
 };
 const cuisineBg = c => (c && CUISINE_BG[c.toLowerCase()]) || '#F2F0EB';
 
-const STATIC_TABS = [
-  { id: 'all',      label: 'All' },
-  { id: 'trending', label: '🔥 Trending' },
-  { id: 'new',      label: '✨ New' },
-  { id: 'quick',    label: '⚡ Quick' },
+const SORT_TABS = [
+  { id: 'new',       label: '✨ New' },
+  { id: 'trending',  label: '🔥 Trending' },
+  { id: 'top_rated', label: '⭐ Top Rated' },
 ];
 
 function totalMinutes(r) { return (r.prep_time || 0) + (r.cook_time || 0); }
@@ -49,7 +48,11 @@ export default function DiscoverPage({ user }) {
   const [exploreLoading, setExploreLoading] = useState(true);
   const [failedImages, setFailedImages]     = useState(new Set());
   const [search, setSearch]                 = useState('');
-  const [activeFilter, setActiveFilter]     = useState('all');
+  const [discoverSort, setDiscoverSort]     = useState('new');
+  const [activeCuisine, setActiveCuisine]   = useState(null);
+  const [quickOnly, setQuickOnly]           = useState(false);
+  const [cuisineOpen, setCuisineOpen]       = useState(false);
+  const cuisineRef = useRef(null);
 
   const [feedRecipes, setFeedRecipes]   = useState([]);
   const [feedLoading, setFeedLoading]   = useState(false);
@@ -79,6 +82,13 @@ export default function DiscoverPage({ user }) {
       requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
     }
   }, []);
+
+  useEffect(() => {
+    if (!cuisineOpen) return;
+    const handler = (e) => { if (cuisineRef.current && !cuisineRef.current.contains(e.target)) setCuisineOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [cuisineOpen]);
 
   useEffect(() => {
     apiFetch('/recipes/explore')
@@ -151,24 +161,19 @@ export default function DiscoverPage({ user }) {
     setSavingId(null);
   };
 
-  const cuisineSet  = new Set(exploreRecipes.map(r => r.cuisine).filter(Boolean));
-  const categorySet = new Set(exploreRecipes.map(r => r.category).filter(Boolean));
-  const dynamicTabs = [
-    ...Array.from(categorySet).map(c => ({ id: c, label: c })),
-    ...Array.from(cuisineSet).filter(c => !categorySet.has(c)).map(c => ({ id: c, label: c })),
-  ];
-  const filterTabs = [...STATIC_TABS, ...dynamicTabs];
+  // Build cuisine+category options for dropdown
+  const cuisineOptions = Array.from(new Set([
+    ...exploreRecipes.map(r => r.category).filter(Boolean),
+    ...exploreRecipes.map(r => r.cuisine).filter(Boolean),
+  ])).sort();
 
   let filtered = [...exploreRecipes];
-  if (activeFilter === 'trending') {
-    filtered.sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
-  } else if (activeFilter === 'quick') {
+
+  if (activeCuisine) {
+    filtered = filtered.filter(r => r.cuisine === activeCuisine || r.category === activeCuisine);
+  }
+  if (quickOnly) {
     filtered = filtered.filter(r => { const t = totalMinutes(r); return t > 0 && t <= 30; });
-  } else if (activeFilter !== 'all' && activeFilter !== 'new') {
-    filtered = filtered.filter(r => {
-      const tags = r.tags ? r.tags.split(',').map(t => t.trim().toLowerCase()) : [];
-      return r.cuisine === activeFilter || r.category === activeFilter || tags.includes(activeFilter.toLowerCase());
-    });
   }
   if (search.trim()) {
     const q = search.toLowerCase();
@@ -179,6 +184,13 @@ export default function DiscoverPage({ user }) {
       (r.tags     || '').toLowerCase().includes(q)
     );
   }
+  if (discoverSort === 'trending') {
+    filtered = [...filtered].sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+  } else if (discoverSort === 'top_rated') {
+    filtered = [...filtered].sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
+  }
+
+  const hasFilters = activeCuisine || quickOnly || search.trim();
 
   // Spotlight: 3 newest recipes with images, only shown on default All view
   const spotlight = exploreRecipes
@@ -187,7 +199,7 @@ export default function DiscoverPage({ user }) {
 
   const showingFeed    = tab === 'following';
   const showingExplore = !showingFeed && tab !== 'people';
-  const showSpotlight  = showingExplore && activeFilter === 'all' && !search.trim() && spotlight.length >= 2;
+  const showSpotlight  = showingExplore && !activeCuisine && !quickOnly && !search.trim() && discoverSort === 'new' && spotlight.length >= 2;
 
   return (
     <div className="ex-page">
@@ -201,7 +213,7 @@ export default function DiscoverPage({ user }) {
                 onClick={() => setTab('following')}>Following</button>
             )}
             <button className={`discover-mode-btn${showingExplore ? ' discover-mode-btn--active' : ''}`}
-              onClick={() => { setTab('all'); setActiveFilter('all'); }}>Discover</button>
+              onClick={() => { setTab('all'); }}>Discover</button>
             <button className={`discover-mode-btn${tab === 'people' ? ' discover-mode-btn--active' : ''}`}
               onClick={() => setTab('people')}>People</button>
           </div>
@@ -219,11 +231,67 @@ export default function DiscoverPage({ user }) {
         </div>
 
         {showingExplore && (
-          <div className="ex-tabs">
-            {filterTabs.map(t => (
-              <button key={t.id} className={`ex-tab${activeFilter === t.id ? ' ex-tab--active' : ''}`}
-                onClick={() => setActiveFilter(t.id)}>{t.label}</button>
-            ))}
+          <div className="ex-filter-row">
+            {/* Sort tabs */}
+            <div className="ex-sort-tabs">
+              {SORT_TABS.map(s => (
+                <button key={s.id}
+                  className={`ex-sort-tab${discoverSort === s.id ? ' ex-sort-tab--active' : ''}`}
+                  onClick={() => setDiscoverSort(s.id)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="ex-filter-divider" />
+
+            {/* Cuisine / Category dropdown */}
+            <div className="ex-cuisine-wrap" ref={cuisineRef}>
+              <button
+                className={`ex-filter-pill${activeCuisine ? ' ex-filter-pill--active' : ''}`}
+                onClick={() => setCuisineOpen(o => !o)}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 8h6M8 5v6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                {activeCuisine || 'Cuisine'}
+                <svg className={`ex-pill-chevron${cuisineOpen ? ' ex-pill-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {cuisineOpen && (
+                <div className="ex-cuisine-dropdown">
+                  {activeCuisine && (
+                    <button className="ex-cuisine-item ex-cuisine-item--clear"
+                      onClick={() => { setActiveCuisine(null); setCuisineOpen(false); }}>
+                      ✕ Clear
+                    </button>
+                  )}
+                  {cuisineOptions.map(c => (
+                    <button key={c}
+                      className={`ex-cuisine-item${activeCuisine === c ? ' ex-cuisine-item--active' : ''}`}
+                      onClick={() => { setActiveCuisine(activeCuisine === c ? null : c); setCuisineOpen(false); }}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick toggle */}
+            <button
+              className={`ex-filter-pill${quickOnly ? ' ex-filter-pill--active' : ''}`}
+              onClick={() => setQuickOnly(q => !q)}>
+              ⚡ Under 30m
+            </button>
+
+            {/* Clear all */}
+            {hasFilters && (
+              <button className="ex-filter-clear"
+                onClick={() => { setActiveCuisine(null); setQuickOnly(false); setSearch(''); }}>
+                ✕ Clear
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -432,7 +500,7 @@ export default function DiscoverPage({ user }) {
               <div className="ex-spotlight">
                 <div className="ex-spotlight-label">
                   <span>Recently added</span>
-                  <button className="ex-spotlight-see-all" onClick={() => setActiveFilter('new')}>See all →</button>
+                  <button className="ex-spotlight-see-all" onClick={() => setDiscoverSort('new')}>See all →</button>
                 </div>
                 <div className="ex-spotlight-row">
                   {spotlight.map(recipe => {

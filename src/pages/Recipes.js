@@ -35,15 +35,22 @@ const IMPORT_METHODS = [
 export default function Recipes({ user }) {
   const [recipes, setRecipes]           = useState([]);
   const [search, setSearch]             = useState('');
-  const [activeCuisine, setActiveCuisine] = useState('All');
+  const [activeCuisine, setActiveCuisine] = useState(null);
   const [activeTags, setActiveTags]     = useState(new Set());
+  const [timeFilter, setTimeFilter]     = useState('any');
   const [loading, setLoading]           = useState(true);
   const [sort, setSort]                 = useState('default');
   const [sortOpen, setSortOpen]         = useState(false);
+  const [cuisineOpen, setCuisineOpen]   = useState(false);
+  const [tagsOpen, setTagsOpen]         = useState(false);
+  const [timeOpen, setTimeOpen]         = useState(false);
   const [failedImages, setFailedImages] = useState(new Set());
   const navigate  = useNavigate();
   const location  = useLocation();
-  const sortRef   = useRef(null);
+  const sortRef    = useRef(null);
+  const cuisineRef = useRef(null);
+  const tagsRef    = useRef(null);
+  const timeRef    = useRef(null);
 
   const goToRecipe = (id) => {
     sessionStorage.setItem('recipes_scrollY', String(window.scrollY));
@@ -68,11 +75,24 @@ export default function Recipes({ user }) {
   }, [user]);
 
   useEffect(() => {
-    if (!sortOpen) return;
-    const handler = (e) => { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [sortOpen]);
+    const refs = [
+      [sortOpen,    sortRef,    setSortOpen],
+      [cuisineOpen, cuisineRef, setCuisineOpen],
+      [tagsOpen,    tagsRef,    setTagsOpen],
+      [timeOpen,    timeRef,    setTimeOpen],
+    ];
+    const handlers = refs.map(([open, ref, setter]) => {
+      if (!open) return null;
+      const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setter(false); };
+      document.addEventListener('mousedown', h);
+      return h;
+    });
+    return () => {
+      refs.forEach(([,, setter], i) => {
+        if (handlers[i]) document.removeEventListener('mousedown', handlers[i]);
+      });
+    };
+  }, [sortOpen, cuisineOpen, tagsOpen, timeOpen]);
 
   if (!user) {
     return (
@@ -89,8 +109,7 @@ export default function Recipes({ user }) {
     );
   }
 
-  const cuisines = ['All', ...Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean)))];
-  const categorySet = new Set(recipes.map(r => r.category).filter(Boolean));
+  const cuisineOptions = Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean))).sort();
 
   const allTags = (() => {
     const freq = {};
@@ -108,8 +127,11 @@ export default function Recipes({ user }) {
     return next;
   });
 
-  const clearFilters = () => { setActiveCuisine('All'); setActiveTags(new Set()); setSearch(''); };
-  const hasFilters = activeCuisine !== 'All' || activeTags.size > 0 || search;
+  const clearFilters = () => {
+    setActiveCuisine(null); setActiveTags(new Set());
+    setTimeFilter('any'); setSearch(''); setSort('default');
+  };
+  const hasFilters = activeCuisine || activeTags.size > 0 || timeFilter !== 'any' || search || sort !== 'default';
 
   const filtered = (() => {
     const q = search.toLowerCase();
@@ -119,10 +141,12 @@ export default function Recipes({ user }) {
         || (r.category || '').toLowerCase().includes(q)
         || (r.cuisine  || '').toLowerCase().includes(q)
         || (r.tags     || '').toLowerCase().includes(q);
-      const matchCuisine = activeCuisine === 'All' || r.cuisine === activeCuisine;
+      const matchCuisine = !activeCuisine || r.cuisine === activeCuisine;
       const recipeTags = new Set((r.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean));
       const matchTags = activeTags.size === 0 || [...activeTags].every(t => recipeTags.has(t));
-      return matchSearch && matchCuisine && matchTags;
+      const t = (r.prep_time || 0) + (r.cook_time || 0);
+      const matchTime = timeFilter === 'any' || (timeFilter === '30' && t > 0 && t <= 30) || (timeFilter === '60' && t > 0 && t <= 60);
+      return matchSearch && matchCuisine && matchTags && matchTime;
     });
     if (sort === 'top-rated') list = [...list].sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
     else if (sort === 'az')   list = [...list].sort((a, b) => a.recipe_name.localeCompare(b.recipe_name));
@@ -157,8 +181,7 @@ export default function Recipes({ user }) {
         {!loading && recipes.length > 0 && (
           <div className="recipes-stats">
             <span className="recipes-stat">{recipes.length} recipe{recipes.length !== 1 ? 's' : ''}</span>
-            {categorySet.size > 0 && <><span className="recipes-stat-dot">·</span><span className="recipes-stat">{categorySet.size} categor{categorySet.size !== 1 ? 'ies' : 'y'}</span></>}
-            {cuisines.length > 2 && <><span className="recipes-stat-dot">·</span><span className="recipes-stat">{cuisines.length - 1} cuisine{cuisines.length > 2 ? 's' : ''}</span></>}
+            {cuisineOptions.length > 0 && <><span className="recipes-stat-dot">·</span><span className="recipes-stat">{cuisineOptions.length} cuisine{cuisineOptions.length !== 1 ? 's' : ''}</span></>}
             {hasFilters && <><span className="recipes-stat-dot">·</span><span className="recipes-stat recipes-stat--filtered">{filtered.length} showing</span></>}
           </div>
         )}
@@ -183,28 +206,26 @@ export default function Recipes({ user }) {
           )}
         </div>
 
-        <div className="recipes-chips-row">
-          <div className="recipes-sort-wrap" ref={sortRef}>
-            <button
-              className={`filter-chip recipes-sort-pill${sortOpen ? ' filter-chip--active' : ''}`}
-              onClick={() => setSortOpen(o => !o)}
-            >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+        <div className="recipes-pills-row">
+
+          {/* Sort */}
+          <div className="recipes-pill-wrap" ref={sortRef}>
+            <button className={`recipes-pill${sort !== 'default' ? ' recipes-pill--active' : ''}`}
+              onClick={() => setSortOpen(o => !o)}>
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
                 <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               {SORT_OPTIONS.find(o => o.value === sort)?.label}
-              <svg className={`sort-chevron${sortOpen ? ' sort-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
+              <svg className={`recipes-pill-chevron${sortOpen ? ' recipes-pill-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
                 <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
             {sortOpen && (
-              <div className="sort-dropdown">
+              <div className="recipes-dropdown">
                 {SORT_OPTIONS.map(o => (
-                  <button
-                    key={o.value}
-                    className={`sort-dropdown-item${sort === o.value ? ' sort-dropdown-item--active' : ''}`}
-                    onClick={() => { setSort(o.value); setSortOpen(false); }}
-                  >
+                  <button key={o.value}
+                    className={`recipes-dropdown-item${sort === o.value ? ' recipes-dropdown-item--active' : ''}`}
+                    onClick={() => { setSort(o.value); setSortOpen(false); }}>
                     {o.label}
                   </button>
                 ))}
@@ -212,20 +233,91 @@ export default function Recipes({ user }) {
             )}
           </div>
 
-          {(cuisines.length > 1 || allTags.length > 0) && (
-            <div className="recipes-chips-divider" />
+          {/* Cuisine */}
+          {cuisineOptions.length > 0 && (
+            <div className="recipes-pill-wrap" ref={cuisineRef}>
+              <button className={`recipes-pill${activeCuisine ? ' recipes-pill--active' : ''}`}
+                onClick={() => setCuisineOpen(o => !o)}>
+                {activeCuisine || 'Cuisine'}
+                <svg className={`recipes-pill-chevron${cuisineOpen ? ' recipes-pill-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {cuisineOpen && (
+                <div className="recipes-dropdown">
+                  {activeCuisine && (
+                    <button className="recipes-dropdown-item recipes-dropdown-item--clear"
+                      onClick={() => { setActiveCuisine(null); setCuisineOpen(false); }}>
+                      ✕ Clear
+                    </button>
+                  )}
+                  {cuisineOptions.map(c => (
+                    <button key={c}
+                      className={`recipes-dropdown-item${activeCuisine === c ? ' recipes-dropdown-item--active' : ''}`}
+                      onClick={() => { setActiveCuisine(activeCuisine === c ? null : c); setCuisineOpen(false); }}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
-          {cuisines.slice(1).map(c => (
-            <button key={c} className={`filter-chip${activeCuisine === c ? ' filter-chip--active' : ''}`}
-              onClick={() => setActiveCuisine(activeCuisine === c ? 'All' : c)}>{c}</button>
-          ))}
-          {allTags.slice(0, 8).map(t => (
-            <button key={t} className={`filter-chip${activeTags.has(t) ? ' filter-chip--active' : ''}`}
-              onClick={() => toggleTag(t)}>#{t}</button>
-          ))}
+          {/* Time */}
+          <div className="recipes-pill-wrap" ref={timeRef}>
+            <button className={`recipes-pill${timeFilter !== 'any' ? ' recipes-pill--active' : ''}`}
+              onClick={() => setTimeOpen(o => !o)}>
+              ⏱ {timeFilter === '30' ? '≤ 30 min' : timeFilter === '60' ? '≤ 1 hr' : 'Time'}
+              <svg className={`recipes-pill-chevron${timeOpen ? ' recipes-pill-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {timeOpen && (
+              <div className="recipes-dropdown">
+                {[['any','Any time'],['30','≤ 30 min'],['60','≤ 1 hour']].map(([val, label]) => (
+                  <button key={val}
+                    className={`recipes-dropdown-item${timeFilter === val ? ' recipes-dropdown-item--active' : ''}`}
+                    onClick={() => { setTimeFilter(val); setTimeOpen(false); }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Tags */}
+          {allTags.length > 0 && (
+            <div className="recipes-pill-wrap" ref={tagsRef}>
+              <button className={`recipes-pill${activeTags.size > 0 ? ' recipes-pill--active' : ''}`}
+                onClick={() => setTagsOpen(o => !o)}>
+                Tags{activeTags.size > 0 ? ` · ${activeTags.size}` : ''}
+                <svg className={`recipes-pill-chevron${tagsOpen ? ' recipes-pill-chevron--open' : ''}`} width="10" height="10" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {tagsOpen && (
+                <div className="recipes-dropdown recipes-dropdown--tags">
+                  {activeTags.size > 0 && (
+                    <button className="recipes-dropdown-item recipes-dropdown-item--clear"
+                      onClick={() => setActiveTags(new Set())}>
+                      ✕ Clear tags
+                    </button>
+                  )}
+                  {allTags.slice(0, 20).map(t => (
+                    <button key={t}
+                      className={`recipes-dropdown-item${activeTags.has(t) ? ' recipes-dropdown-item--active' : ''}`}
+                      onClick={() => toggleTag(t)}>
+                      #{t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Clear all */}
           {hasFilters && (
-            <button className="filter-chip filter-chip--clear" onClick={clearFilters}>✕ Clear</button>
+            <button className="recipes-clear-btn" onClick={clearFilters}>✕ Clear all</button>
           )}
         </div>
       </div>

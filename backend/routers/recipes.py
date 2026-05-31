@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request, BackgroundTasks
 from bson import ObjectId
 from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection, ratings_collection, images_collection
 from model import Recipe
@@ -317,10 +317,16 @@ async def get_recipes_by_user(user_id: str):
 
 
 @router.get("/{recipe_id}")
-async def get_recipe(recipe_id: str):
+async def get_recipe(recipe_id: str, background_tasks: BackgroundTasks):
     recipe = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
+    if recipe.get("is_public"):
+        background_tasks.add_task(
+            recipes_collection.update_one,
+            {"_id": ObjectId(recipe_id)},
+            {"$inc": {"view_count": 1}}
+        )
     return recipe_to_json(recipe)
 
 
