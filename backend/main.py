@@ -1,16 +1,44 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from contextlib import asynccontextmanager
 import os
 from bson import ObjectId
-from database import client, db, images_collection
+from database import (
+    client, db, images_collection,
+    recipes_collection, follows_collection, comments_collection, ratings_collection,
+)
 from routers import users, recipes, mealPlans, groceryList, follows, comments, ratings
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        await client.admin.command('ping')
+        print("MongoDB connection successful")
+        # One rating per (recipe, user); plus indexes on hot query fields.
+        await ratings_collection.create_index([("recipe_id", 1), ("user_id", 1)], unique=True)
+        await recipes_collection.create_index([("user_id", 1)])
+        await recipes_collection.create_index([("is_public", 1)])
+        await recipes_collection.create_index([("original_recipe_id", 1)])
+        await follows_collection.create_index([("follower_id", 1)])
+        await follows_collection.create_index([("following_id", 1)])
+        await comments_collection.create_index([("recipe_id", 1)])
+    except Exception as e:
+        print(f"MongoDB startup error: {e}")
+    yield
+    client.close()
+
+
+app = FastAPI(lifespan=lifespan)
+
+# Allowed CORS origins, comma-separated, via env (defaults to local dev hosts).
+_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
+ALLOWED_ORIGINS = [o.strip() for o in _origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,19 +62,3 @@ async def serve_image(image_id: str):
     if not doc:
         raise HTTPException(status_code=404)
     return Response(content=doc["data"], media_type=doc.get("content_type", "image/jpeg"))
-
-@app.on_event("startup")
-async def startup_db_client():
-    try:
-        await client.admin.command('ping')
-        print("MongoDB connection successful")
-        from database import ratings_collection
-        await ratings_collection.create_index(
-            [("recipe_id", 1), ("user_id", 1)], unique=True
-        )
-    except Exception as e:
-        print(f"MongoDB startup error: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()

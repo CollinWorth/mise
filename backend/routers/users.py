@@ -1,6 +1,7 @@
 import asyncio
+import re
 from fastapi import APIRouter, HTTPException, Body, Depends
-from database import users_collection as db, recipes_collection, follows_collection
+from database import users_collection as db, recipes_collection, follows_collection, parse_object_id
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from bson import ObjectId
@@ -32,7 +33,7 @@ async def create_user(user: UserIn):
     existing = await db.find_one({"email": user.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already exists")
-    user_dict = user.dict()
+    user_dict = user.model_dump()
     user_dict["password"] = pwd_context.hash(user_dict["password"])
     result = await db.insert_one(user_dict)
     return {"id": str(result.inserted_id), "message": "User created successfully"}
@@ -103,7 +104,7 @@ async def delete_account(data: AccountDelete, user_id: str = Depends(get_current
 async def search_users(q: str = ""):
     if not q.strip():
         return []
-    cursor = db.find({"name": {"$regex": q.strip(), "$options": "i"}}).limit(20)
+    cursor = db.find({"name": {"$regex": re.escape(q.strip()), "$options": "i"}}).limit(20)
     users = []
     async for u in cursor:
         users.append(u)
@@ -212,7 +213,7 @@ async def get_user_public_recipes(user_id: str):
 
 @router.get("/{user_id}")
 async def get_user(user_id: str):
-    user = await db.find_one({"_id": ObjectId(user_id)})
+    user = await db.find_one({"_id": parse_object_id(user_id, "user_id")})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     uid = str(user["_id"])

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request, BackgroundTasks
 from bson import ObjectId
-from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection, ratings_collection, images_collection
+from database import mealPlans_collection, recipes_collection, users_collection, follows_collection, comments_collection, ratings_collection, images_collection, parse_object_id
 from model import Recipe
 from auth import get_current_user_id, get_optional_user_id
 from pydantic import BaseModel
@@ -12,7 +12,11 @@ import base64
 import json
 import anthropic
 from fractions import Fraction
+from urllib.parse import urlparse
 from recipe_scrapers import scrape_html
+
+# Cap stored image size to stay well under MongoDB's 16 MB BSON document limit.
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 # ── Optional CRF ingredient parser (ingredient-parser-nlp) ───────────────────
 try:
@@ -318,13 +322,14 @@ async def get_recipes_by_user(user_id: str):
 
 @router.get("/{recipe_id}")
 async def get_recipe(recipe_id: str, background_tasks: BackgroundTasks):
-    recipe = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+    oid = parse_object_id(recipe_id, "recipe_id")
+    recipe = await recipes_collection.find_one({"_id": oid})
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
     if recipe.get("is_public"):
         background_tasks.add_task(
             recipes_collection.update_one,
-            {"_id": ObjectId(recipe_id)},
+            {"_id": oid},
             {"$inc": {"view_count": 1}}
         )
     return recipe_to_json(recipe)
@@ -889,21 +894,9 @@ def _parse_colon_ingredient(line: str) -> dict | None:
     return {'name': name, 'quantity': qty, 'unit': unit} if name else None
 
 
-@router.post("/{recipe_id}/like")
-async def like_recipe(recipe_id: str):
-    result = await recipes_collection.find_one_and_update(
-        {"_id": ObjectId(recipe_id)},
-        {"$inc": {"like_count": 1}},
-        return_document=True,
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="Recipe not found")
-    return {"like_count": result.get("like_count", 0)}
-
-
 @router.post("/{recipe_id}/save")
-async def save_recipe_to_collection(recipe_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
-    source = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+async def save_recipe_to_collection(recipe_id: str, user_id: str = Depends(get_current_user_id)):
+    source = await recipes_collection.find_one({"_id": parse_object_id(recipe_id, "recipe_id")})
     if not source:
         raise HTTPException(status_code=404, detail="Recipe not found")
     author_doc = await users_collection.find_one({"_id": source["user_id"]})
@@ -913,19 +906,14 @@ async def save_recipe_to_collection(recipe_id: str, request: Request, user_id: s
                          "is_public", "original_recipe_id", "original_author_name", "is_modified")}
     copy["user_id"] = ObjectId(user_id)
     copy["is_public"] = False
-    copy["like_count"] = 0
     copy["avg_rating"] = 0.0
     copy["rating_count"] = 0
     copy["original_recipe_id"] = recipe_id
     copy["original_recipe_name"] = source.get("recipe_name", "")
     copy["original_author_name"] = author_name
     copy["is_modified"] = False
-    # Normalize localhost image URLs to the server's public base URL
-    img = copy.get("image_url")
-    if img:
-        m = re.match(r'https?://localhost(?::\d+)?(/uploads/.*)', img)
-        if m:
-            copy["image_url"] = f"{_public_base_url(request)}{m.group(1)}"
+    # Normalize the image to a relative served path (no-op if already one)
+    copy["image_url"] = await _maybe_archive_image(copy.get("image_url"))
     result = await recipes_collection.insert_one(copy)
     return {"id": str(result.inserted_id), "message": "Saved to your recipes"}
 
@@ -943,69 +931,73 @@ async def get_recipe_versions(recipe_id: str):
     return await _attach_author_names(results)
 
 
-def _public_base_url(request: Request) -> str:
-    """Return the externally-visible base URL, preferring the BASE_URL env var."""
-    env = os.getenv("BASE_URL", "").rstrip("/")
-    if env:
-        return env
-    # Fall back to the request's own base URL (works for local dev)
-    return str(request.base_url).rstrip("/")
+async def _maybe_archive_image(url: str | None) -> str | None:
+    """Normalize a recipe image to a RELATIVE served path, copying external images in.
 
-
-async def _maybe_archive_image(url: str | None, request: Request) -> str | None:
-    """Download an external image URL and store it locally; return the local URL."""
+    All stored image URLs are relative (e.g. "/images/{id}" or "/uploads/x.jpg") so
+    they're independent of host and reverse-proxy prefix; the frontend's imgUrl()
+    prepends the configured API base at render time. External images are downloaded
+    into the `images` collection (the local filesystem is ephemeral on Railway).
+    """
     if not url:
         return url
-    # Rebase any localhost uploads URL to the server's public URL
-    m = re.match(r'https?://localhost(?::\d+)?(/uploads/.*)', url)
-    if m:
-        return f"{_public_base_url(request)}{m.group(1)}"
-    if '/uploads/' in url or not url.startswith('http'):
+    parsed = urlparse(url)
+    # Already a relative path (our own served image) — keep as-is
+    if not parsed.scheme:
         return url
-    base_url = _public_base_url(request)
-    if url.startswith(base_url):
+    # Absolute URL pointing at our own server — reduce to its relative path
+    own_host = urlparse(os.getenv("BASE_URL", "")).netloc
+    if parsed.hostname in ("localhost", "127.0.0.1") or (own_host and parsed.netloc == own_host):
+        return parsed.path
+    if not url.startswith("http"):
         return url
+    # Genuine external image — download and persist, return a relative path
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             r = await client.get(url)
         if r.status_code != 200:
             return url
         ct = r.headers.get('content-type', '').split(';')[0].strip().lower()
-        ext = {
-            'image/jpeg': '.jpg', 'image/jpg': '.jpg',
-            'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif',
-        }.get(ct, '.jpg')
-        filename = f"{uuid.uuid4().hex}{ext}"
-        os.makedirs("uploads", exist_ok=True)
-        with open(f"uploads/{filename}", "wb") as f:
-            f.write(r.content)
-        return f"{base_url}/uploads/{filename}"
+        if not ct.startswith('image/'):
+            return url
+        result = await images_collection.insert_one({"data": r.content, "content_type": ct})
+        return f"/images/{result.inserted_id}"
     except Exception:
         return url
 
 
 @router.post("/")
-async def create_recipe(request: Request, recipe: Recipe, user_id: str = Depends(get_current_user_id)):
-    recipe_dict = recipe.dict()
+async def create_recipe(recipe: Recipe, user_id: str = Depends(get_current_user_id)):
+    recipe_dict = recipe.model_dump()
     recipe_dict["user_id"] = ObjectId(user_id)
-    recipe_dict["image_url"] = await _maybe_archive_image(recipe_dict.get("image_url"), request)
+    recipe_dict["image_url"] = await _maybe_archive_image(recipe_dict.get("image_url"))
     result = await recipes_collection.insert_one(recipe_dict)
     return {"id": str(result.inserted_id), "message": "Recipe created successfully"}
 
 
+# Server-managed fields the client must never overwrite on edit (a full-document
+# replace would otherwise reset them to the model's zero defaults / drop them).
+_PRESERVE_ON_UPDATE = ("avg_rating", "rating_count", "view_count", "created_at")
+
+
 @router.put("/{recipe_id}")
-async def update_recipe(request: Request, recipe_id: str, recipe: Recipe, user_id: str = Depends(get_current_user_id)):
-    existing = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+async def update_recipe(recipe_id: str, recipe: Recipe, user_id: str = Depends(get_current_user_id)):
+    oid = parse_object_id(recipe_id, "recipe_id")
+    existing = await recipes_collection.find_one({"_id": oid})
     if not existing:
         raise HTTPException(status_code=404, detail="Recipe not found")
     if str(existing.get("user_id")) != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    recipe_dict = recipe.dict()
+    recipe_dict = recipe.model_dump()
     try:
         recipe_dict["user_id"] = ObjectId(recipe_dict["user_id"])
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user_id format")
-    recipe_dict["image_url"] = await _maybe_archive_image(recipe_dict.get("image_url"), request)
+    recipe_dict["image_url"] = await _maybe_archive_image(recipe_dict.get("image_url"))
+    # Carry over ratings / view counts / creation date from the stored doc
+    for field in _PRESERVE_ON_UPDATE:
+        if field in existing:
+            recipe_dict[field] = existing[field]
     # Preserve provenance; mark as modified once edited
     if existing.get("original_recipe_id"):
         recipe_dict["original_recipe_id"] = existing["original_recipe_id"]
@@ -1013,7 +1005,7 @@ async def update_recipe(request: Request, recipe_id: str, recipe: Recipe, user_i
         recipe_dict["original_author_name"] = existing.get("original_author_name")
         recipe_dict["is_modified"] = True
     result = await recipes_collection.find_one_and_replace(
-        {"_id": ObjectId(recipe_id)},
+        {"_id": oid},
         recipe_dict,
         return_document=True,
     )
@@ -1022,23 +1014,27 @@ async def update_recipe(request: Request, recipe_id: str, recipe: Recipe, user_i
 
 @router.delete("/{recipe_id}")
 async def delete_recipe(recipe_id: str, user_id: str = Depends(get_current_user_id)):
-    existing = await recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+    oid = parse_object_id(recipe_id, "recipe_id")
+    existing = await recipes_collection.find_one({"_id": oid})
     if not existing:
         raise HTTPException(status_code=404, detail="Recipe not found")
     if str(existing.get("user_id")) != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    await recipes_collection.delete_one({"_id": ObjectId(recipe_id)})
+    await recipes_collection.delete_one({"_id": oid})
     await ratings_collection.delete_many({"recipe_id": recipe_id})
     return {"message": "Recipe deleted successfully"}
 
 
 @router.post("/upload-image")
-async def upload_image(request: Request, file: UploadFile = File(...), _: str = Depends(get_current_user_id)):
+async def upload_image(file: UploadFile = File(...), _: str = Depends(get_current_user_id)):
     content_type = file.content_type or "image/jpeg"
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
     data = await file.read()
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large (max 10 MB)")
     result = await images_collection.insert_one({"data": data, "content_type": content_type})
-    image_id = str(result.inserted_id)
-    return {"url": f"{_public_base_url(request)}/images/{image_id}"}
+    return {"url": f"/images/{result.inserted_id}"}
 
 
 @router.post("/{recipe_id}/{selected_day}/{user_id}")

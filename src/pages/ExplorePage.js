@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
+import LazyImage from '../components/LazyImage';
 import './css/ExplorePage.css';
 // Note: uses own card styles — intentionally different from Recipes page
 
@@ -165,7 +166,7 @@ export default function ExplorePage({ user }) {
         </div>
       ) : (
         <div className="ex-grid">
-          {filtered.map(recipe => {
+          {filtered.map((recipe, idx) => {
             const id = recipe._id || recipe.id;
             const liked = likedIds.has(id);
             const saved = savedIds.has(id);
@@ -183,10 +184,10 @@ export default function ExplorePage({ user }) {
                 {/* Image */}
                 {hasImage && (
                   <div className="ex-card-img">
-                    <img
+                    <LazyImage
                       src={imgUrl(recipe.image_url)}
                       alt={recipe.recipe_name}
-                      loading="lazy"
+                      eager={idx < 8}
                       onError={() => setFailedImages(prev => new Set(prev).add(id))}
                     />
                     {recipe.cuisine && (

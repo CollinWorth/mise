@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 
 
@@ -21,7 +21,6 @@ class Recipe(BaseModel):
     tags: Optional[str] = Field(default=None, title="Attribute tags, e.g. quick, healthy, vegan")
     image_url: Optional[str] = Field(default=None, title="Image URL for the Recipe")
     is_public: bool = False
-    like_count: int = 0
     avg_rating: float = 0.0
     rating_count: int = 0
     user_id: str
@@ -41,5 +40,4 @@ class GroceryList(BaseModel):
     name: str
     items: List[GroceryItem] = []
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)

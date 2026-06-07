@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
+import LazyImage from '../components/LazyImage';
 import './css/FeedPage.css';
 
 const CUISINE_PASTELS = {
@@ -98,7 +99,7 @@ export default function FeedPage({ user }) {
           </div>
         ) : (
           <div className="feed-posts">
-            {recipes.map(recipe => {
+            {recipes.map((recipe, idx) => {
               const id = recipe._id || recipe.id;
               const liked = likedIds.has(id);
               const saved = savedIds.has(id);
@@ -120,7 +121,7 @@ export default function FeedPage({ user }) {
                   {/* Image or text hero */}
                   <div className="feed-post-img" onClick={() => navigate(`/recipes/${id}`)}>
                     {recipe.image_url
-                      ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy" />
+                      ? <LazyImage src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} eager={idx < 3} />
                       : <div className="feed-post-placeholder" style={{background: cuisinePastel(recipe.cuisine)}}>
                           {recipe.category && <span className="feed-placeholder-pill">{recipe.category}</span>}
                           <span className="feed-post-placeholder-name">{recipe.recipe_name}</span>

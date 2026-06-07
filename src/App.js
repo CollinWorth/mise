@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom';
 import './styles/global.css';
 import './App.css';
 import './components/css/Toast.css';
@@ -24,6 +24,15 @@ import CookMode from './pages/CookMode';
 import NotFoundPage from './pages/NotFoundPage';
 import LandingPage from './pages/LandingPage';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  const navType = useNavigationType();
+  useEffect(() => {
+    if (navType !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, navType]);
+  return null;
+}
+
 function App() {
   const [user, setUser] = useState(getStoredUser);
 
@@ -45,6 +54,7 @@ function App() {
   return (
     <>
     <Router>
+      <ScrollToTop />
       <ToastProvider>
       <div className="App">
         <NavBar user={user} onLogout={handleLogout} />

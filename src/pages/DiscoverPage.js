@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
+import LazyImage from '../components/LazyImage';
 import './css/ExplorePage.css';
 import './css/FeedPage.css';
 
@@ -310,7 +311,7 @@ export default function DiscoverPage({ user }) {
             </div>
           ) : (
             <div className="feed-posts">
-              {feedRecipes.map(recipe => {
+              {feedRecipes.map((recipe, idx) => {
                 const id = recipe._id || recipe.id;
                 const saved = savedIds.has(id);
                 const authorInitial = recipe.author_name?.[0]?.toUpperCase() ?? '?';
@@ -326,7 +327,7 @@ export default function DiscoverPage({ user }) {
                     </div>
                     <div className="feed-post-img" onClick={() => goToRecipe(id)}>
                       {recipe.image_url && !failedImages.has(id)
-                        ? <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
+                        ? <LazyImage src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} eager={idx < 3}
                             onError={() => setFailedImages(prev => new Set(prev).add(id))} />
                         : <div className="feed-post-placeholder" style={{background: cuisineBg(recipe.cuisine)}}>
                             {recipe.category && <span className="feed-placeholder-pill">{recipe.category}</span>}
@@ -423,7 +424,7 @@ export default function DiscoverPage({ user }) {
                           {meta && <span className="people-card-meta">{meta}</span>}
                         </div>
                         {person.sample_image && (
-                          <img className="people-card-thumb" src={imgUrl(person.sample_image)} alt="" loading="lazy" />
+                          <LazyImage className="people-card-thumb" src={imgUrl(person.sample_image)} alt="" />
                         )}
                         {!isMe && user && (
                           <button className={`people-follow-btn${following ? ' people-follow-btn--following' : ''}`}
@@ -503,13 +504,13 @@ export default function DiscoverPage({ user }) {
                   <button className="ex-spotlight-see-all" onClick={() => setDiscoverSort('new')}>See all →</button>
                 </div>
                 <div className="ex-spotlight-row">
-                  {spotlight.map(recipe => {
+                  {spotlight.map((recipe, idx) => {
                     const id = recipe._id || recipe.id;
                     const saved = savedIds.has(id);
                     return (
                       <div key={id} className="ex-spotlight-card" onClick={() => goToRecipe(id)}>
                         <div className="ex-spotlight-img">
-                          <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
+                          <LazyImage src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} eager={idx < 6}
                             onError={() => setFailedImages(prev => new Set(prev).add(id))} />
                           <button className={`ex-spotlight-save${saved ? ' ex-spotlight-save--saved' : ''}`}
                             onClick={e => handleSave(e, id)} disabled={savingId === id}>
@@ -548,7 +549,7 @@ export default function DiscoverPage({ user }) {
               </div>
             )}
             <div className="ex-grid">
-              {filtered.map(recipe => {
+              {filtered.map((recipe, idx) => {
                 const id = recipe._id || recipe.id;
                 const saved = savedIds.has(id);
                 const time = fmtTime(recipe);
@@ -560,7 +561,7 @@ export default function DiscoverPage({ user }) {
                     onClick={() => goToRecipe(id)}>
                     {hasImage && (
                       <div className="ex-card-img">
-                        <img src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} loading="lazy"
+                        <LazyImage src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} eager={idx < 8}
                           onError={() => setFailedImages(prev => new Set(prev).add(id))} />
                         {recipe.cuisine && <span className="ex-card-cuisine">{recipe.cuisine}</span>}
                       </div>

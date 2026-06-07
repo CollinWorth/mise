@@ -559,7 +559,6 @@ async def run():
             **r,
             "user_id": uid,
             "is_public": True,
-            "like_count": 0,
             "is_modified": False,
             "original_recipe_id": None,
             "original_author_name": None,

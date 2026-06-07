@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import HTTPException
 import motor.motor_asyncio
 import os
 from dotenv import load_dotenv
+from bson import ObjectId
+from bson.errors import InvalidId
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,6 +22,12 @@ ratings_collection    = db.ratings
 images_collection     = db.images
 
 
+def parse_object_id(value, name: str = "id") -> ObjectId:
+    """Parse a string into an ObjectId, raising 400 (not 500) on malformed input."""
+    try:
+        return ObjectId(value)
+    except (InvalidId, TypeError):
+        raise HTTPException(status_code=400, detail=f"Invalid {name}")
 
 
 #mongosh "mongodb+srv://cookindb.wcbu46g.mongodb.net/" --apiVersion 1 --username collin
