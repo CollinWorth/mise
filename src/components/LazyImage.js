@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function LazyImage({ src, eager = false, ...rest }) {
+export default function LazyImage({ src, alt = '', eager = false, ...rest }) {
   const ref = useRef(null);
   const [show, setShow] = useState(eager);
 
@@ -16,5 +16,5 @@ export default function LazyImage({ src, eager = false, ...rest }) {
     return () => observer.disconnect();
   }, [show]);
 
-  return <img ref={ref} src={show ? src : undefined} {...rest} />;
+  return <img ref={ref} src={show ? src : undefined} alt={alt} {...rest} />;
 }
