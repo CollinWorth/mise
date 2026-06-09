@@ -10,7 +10,7 @@ export default function LazyImage({ src, alt = '', eager = false, ...rest }) {
     if (!el || typeof IntersectionObserver === 'undefined') { setShow(true); return; }
     const observer = new IntersectionObserver(
       entries => { if (entries.some(e => e.isIntersecting)) { setShow(true); observer.disconnect(); } },
-      { rootMargin: '1500px 0px' }
+      { rootMargin: '800px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();

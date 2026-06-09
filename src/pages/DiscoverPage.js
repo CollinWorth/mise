@@ -553,16 +553,20 @@ export default function DiscoverPage({ user }) {
                 const id = recipe._id || recipe.id;
                 const saved = savedIds.has(id);
                 const time = fmtTime(recipe);
-                const hasImage = recipe.image_url && !failedImages.has(id);
+                const hasImageUrl = !!recipe.image_url;
+                const imageFailed = failedImages.has(id);
                 return (
                   <article key={id}
-                    className={`ex-card${hasImage ? '' : ' ex-card--no-image'}`}
-                    style={hasImage ? {} : { background: cuisineBg(recipe.cuisine) }}
+                    className={`ex-card${hasImageUrl ? '' : ' ex-card--no-image'}`}
+                    style={hasImageUrl ? {} : { background: cuisineBg(recipe.cuisine) }}
                     onClick={() => goToRecipe(id)}>
-                    {hasImage && (
-                      <div className="ex-card-img">
-                        <LazyImage src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} eager={idx < 8}
-                          onError={() => setFailedImages(prev => new Set(prev).add(id))} />
+                    {hasImageUrl && (
+                      <div className="ex-card-img"
+                        style={imageFailed ? { background: cuisineBg(recipe.cuisine) } : undefined}>
+                        {!imageFailed && (
+                          <LazyImage src={imgUrl(recipe.image_url)} alt={recipe.recipe_name} eager={idx < 8}
+                            onError={() => setFailedImages(prev => new Set(prev).add(id))} />
+                        )}
                         {recipe.cuisine && <span className="ex-card-cuisine">{recipe.cuisine}</span>}
                       </div>
                     )}

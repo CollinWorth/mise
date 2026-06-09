@@ -69,6 +69,67 @@ The net result: whatever shape the user pastes, the DB ends up with a clean rela
 
 The upload control is a hidden `<input type="file" accept="image/*">` triggered by an "↑ Upload" button. On mobile Safari/Chrome, `accept="image/*"` makes the OS present the native chooser with **Take Photo**, **Photo Library**, and **Choose File** — so camera and library both work with no extra code. We intentionally do **not** set the `capture` attribute, which would force the camera and remove the library option.
 
+## The three ingestion methods, end-to-end
+
+Reference walkthrough for what actually happens for each of the three ways a recipe gets an image. All three paths converge on the same canonical storage shape: a relative `/images/{ObjectId}` in the recipe document, with the bytes in the `images` collection.
+
+### 1. Direct upload (file picker / phone camera)
+
+1. Frontend `handleImageUpload` ([src/pages/AddRecipe.js](../src/pages/AddRecipe.js), [src/pages/EditRecipe.js](../src/pages/EditRecipe.js)) POSTs the file to `POST /recipes/upload-image` as multipart.
+2. Backend `upload_image` ([backend/routers/recipes.py:1036](../backend/routers/recipes.py)) validates `image/*` content type (→ 400 if not), enforces ≤ `MAX_IMAGE_BYTES` (10 MB → 413 if not), inserts the raw bytes into the `images` collection, returns `{ "url": "/images/{ObjectId}" }`.
+3. Frontend sets `form.image_url = "/images/{id}"`. Preview is instant (`imgUrl()` matches the 24-hex pattern → `${API}/images/{id}`).
+4. On save, `_maybe_archive_image` sees `/images/{id}`, hits the ObjectId fast-path, returns unchanged.
+5. **Stored as:** `/images/{id}`.
+
+### 2. Pasted URL (typed into the Image field)
+
+The input is `type="text"`, so the browser doesn't block submit regardless of what's in there. Three real sub-cases for whatever string the user types:
+
+**2a. Genuine external image** (`https://example.com/photo.jpg`)
+- Preview: `imgUrl()` returns the URL unchanged → browser fetches the external host directly.
+- On save: `_maybe_archive_image` skips the ObjectId fast-path, has a scheme, hostname is not ours → falls through to the "external" branch. Downloads with `httpx`, verifies `Content-Type: image/*`, stores bytes in `images`, returns `/images/{newId}`. On any failure (network, 404, non-image, timeout) the original URL is kept (non-fatal — the recipe still saves).
+- **Stored as:** `/images/{newId}` on success, original URL on failure.
+
+**2b. Legacy / half-URL pointing at one of our images** (`mise-production-…/images/{id}`, `https://misekitchen.duckdns.org/images/{id}` (no `/api`), `localhost:8000/images/{id}`)
+- Preview: `imgUrl()` finds the embedded `/images/{24-hex}` segment, returns `${API}/images/{id}` → loads via the proxy.
+- On save: `_maybe_archive_image`'s ObjectId fast-path matches → returns just `/images/{id}` (strips the host/scheme/prefix junk).
+- **Stored as:** `/images/{id}` (clean).
+
+**2c. Garbage / non-URL string** (`not a url`)
+- Preview: `imgUrl()` returns the string unchanged → broken `<img>` (the small `?` placeholder).
+- On save: no ObjectId match, `urlparse` finds no scheme, doesn't start with `http` → returned unchanged.
+- **Stored as:** the raw string. Recipe saves; image just doesn't display.
+
+### 3. Scrape / AI import (URL scrape, Claude vision photo, free-text parse)
+
+- The scraper/vision step (`/recipes/scrape`, `/recipes/scrape-smart`, `/recipes/parse-photo`, `/recipes/parse-text`) populates `image_url` with whatever the source provided — usually an external `https://…` URL from the recipe site, sometimes a relative path we already host.
+- That value flows through `create_recipe` → `_maybe_archive_image`. From there the logic is identical to method 2 above: external URLs are downloaded and archived (case 2a behavior), URLs that already contain our ObjectId pattern are reduced to the relative form (case 2b), failures fall through preserving the original URL.
+- **Stored as:** `/images/{newId}` for successful archives, original URL for failures.
+
+### One unifying fact
+
+After save, the canonical shape in the DB is **`/images/{ObjectId}`** for anything that succeeded in getting into our `images` collection (regardless of which method). `imgUrl()` only needs to handle that one shape on render — every other shape it sees is either a true external URL (pass through) or a junk string (broken image, no harm done to layout).
+
+## Display stability (scroll-jump fix)
+
+Until 2026-06-08 the Discover page's masonry grid (`.ex-grid`, CSS multi-column) made the page visibly jump as the user scrolled: image cards had `width: 100%; height: auto` with no reserved space, so each lazy-loaded image expanded its card from zero to its natural height, pushing every later card in the same CSS column down. A custom `LazyImage` with `rootMargin: 1500px` (load a viewport ahead) helped on slow scrolls but fast-flick scrolls outran the buffer, and the failure path was worse — when an image errored, the entire `.ex-card-img` block unmounted via the `failedImages` set, collapsing the card and shifting everything below.
+
+The fix (option 3 from `Upcoming Features.md` — uniform aspect-ratio):
+
+1. **Reserve image height at render time.** `.ex-card-img` ([src/pages/css/ExplorePage.css:249](../src/pages/css/ExplorePage.css)) now sets `aspect-ratio: 4 / 3` and a subtle `background: var(--surface-raised)` so the box is always at its final size from first paint, before the image bytes arrive. The `<img>` inside is `width: 100%; height: 100%; object-fit: cover` so the image fills the reserved box without distortion (matches what spotlight and feed posts already do).
+2. **Keep the box mounted on image error.** [src/pages/DiscoverPage.js](../src/pages/DiscoverPage.js) main `ex-grid` map now decides the card *layout* from `recipe.image_url` alone (mount-time and stable), and uses `failedImages` only to swap the `<LazyImage>` for a cuisine-colored placeholder *inside* the same `.ex-card-img` box. The card height never changes after mount.
+3. **Cheaper compositor usage.** Moved `will-change: transform` off every grid image and onto the `:hover` rule (`.ex-card:hover .ex-card-img img`), so we're not paying for a separate compositor layer per card just in case the user hovers.
+4. **Off-screen layout skip.** Added `content-visibility: auto; contain-intrinsic-size: 360px 320px` to `.ex-card`. The browser skips layout/paint of off-screen cards entirely, which is a real scroll-perf win on long grids.
+5. **Shrunk lazy buffer.** [src/components/LazyImage.js](../src/components/LazyImage.js) `rootMargin` reduced from `1500px 0px` → `800px 0px`. With height reserved the buffer no longer needs to win a race with the user's scroll velocity; it just needs to start loading "soon enough." Fewer concurrent in-flight image requests during fast scrolls.
+
+### What this changes visually
+Discover image cards now all have the same image-region aspect ratio (4:3). Text-only cards (no image) still vary in body height, so the masonry feel is preserved overall — just the image strips are uniform. If you want true per-image masonry like Pinterest, option 1 in `Upcoming Features.md` is the path (store image w/h on upload/import, render `aspect-ratio: w/h` per image).
+
+### Pages not (yet) covered
+- **Personal Recipes grid** (`.recipe-card-img` in [src/pages/css/Recipes.css](../src/pages/css/Recipes.css)) has the same architecture and the same theoretical jump, but doesn't use `loading="lazy"` so all images request together. Less acute. Applying the same `aspect-ratio: 4/3` + `object-fit: cover` treatment is a one-CSS-block change if it ever becomes noticeable.
+- **Spotlight row** (`.ex-spotlight-img`) already used a fixed `height: 160px` — stable from the start.
+- **Feed posts** (`.feed-post-img img`) already used `aspect-ratio: 4/3; object-fit: cover` — stable from the start.
+
 ## Status
 
 ### Done
