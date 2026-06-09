@@ -35,13 +35,22 @@ Archiving for the latter two happens in **`_maybe_archive_image(url)`** ([backen
 
 ## Rendering
 
-The frontend never uses `image_url` raw — every `<img>` wraps it in `imgUrl()`. The current `imgUrl()` is intentionally permissive: it **extracts the first `/images/...` or `/uploads/...` segment from anywhere in the string** and prepends `REACT_APP_API_URL`. If the URL contains no such segment, it's returned unchanged (treated as a true external image). This means broken-shape inputs all render correctly:
+The frontend never uses `image_url` raw — every `<img>` wraps it in `imgUrl()`. `imgUrl()` is permissive but **carefully scoped** to avoid hijacking external recipe-site URLs:
 
-- `/images/abc` → `${API}/images/abc` (the canonical case)
-- `https://railway-prod-host/images/abc` (legacy absolute) → `${API}/images/abc`
-- `railway-prod-host/images/abc` (no scheme — e.g. a user-pasted half-URL) → `${API}/images/abc`
-- `https://localhost:8000/images/abc` (old dev) → `${API}/images/abc`
-- `https://example.com/photo.jpg` (genuine external) → unchanged, browser fetches directly
+1. If the string contains `/images/{24-hex-ObjectId}` anywhere, extract that and prepend `REACT_APP_API_URL`. The 24-hex-ObjectId shape is what our backend emits and is vanishingly unlikely to appear in a foreign CDN URL by coincidence; a trailing boundary check (`(?![0-9a-fA-F])`) prevents matching the 24-char prefix of a longer hex string.
+2. Else if the string **starts with** `/uploads/`, prepend the API base (relative legacy path). Crucially, it only matches at the start — not mid-URL — so `https://www.thekitchn.com/wp-content/uploads/…/photo.jpg` is **not** hijacked.
+3. Else return unchanged (genuine external image; browser fetches directly).
+
+Cases handled correctly:
+
+- `/images/{id}` → `${API}/images/{id}` (canonical)
+- `https://misekitchen.duckdns.org/images/{id}` (legacy absolute, missing `/api`) → `${API}/images/{id}`
+- `railway-prod-host/images/{id}` (user-pasted half-URL, no scheme) → `${API}/images/{id}`
+- `https://localhost:8000/images/{id}` (old dev) → `${API}/images/{id}`
+- `https://assets.bonappetit.com/photos/.../recipe.jpg` (external CDN) → unchanged
+- `https://www.thekitchn.com/wp-content/uploads/.../photo.jpg` (Wordpress CDN) → unchanged
+
+**Prior bug fixed (2026-06-08):** an earlier overly-broad version of `imgUrl()` extracted any `/images/...` or `/uploads/...` segment from anywhere in the URL, including external CDN URLs. That broke every scraped recipe whose image URL happened to use one of those path words. The current narrower match (ObjectId-shape only, and `/uploads/` only as a path prefix) is the fix.
 
 See Add/Edit previews ([src/pages/AddRecipe.js](../src/pages/AddRecipe.js), [src/pages/EditRecipe.js](../src/pages/EditRecipe.js)). The image URL input is `type="text"` (not `type="url"`) so the browser doesn't block submit when a user pastes a half-URL — the backend normalizes on save.
 
