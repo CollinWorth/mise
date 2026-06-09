@@ -240,7 +240,6 @@
   margin-bottom: var(--space-4); background: var(--surface);
   border: 1.5px solid var(--border); border-radius: var(--radius-lg);
   cursor: pointer; transition: box-shadow var(--transition), border-color var(--transition);
-  content-visibility: auto; contain-intrinsic-size: 360px 320px;
 }
 .ex-card:hover { box-shadow: var(--shadow-lg); border-color: var(--border-strong); }
 .ex-card--no-image { border: none; }
