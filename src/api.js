@@ -2,13 +2,8 @@ const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export function imgUrl(url) {
   if (!url) return url;
-  if (/^https?:\/\/localhost(:\d+)?\//.test(url)) {
-    const path = url.replace(/^https?:\/\/localhost(:\d+)?/, '');
-    return `${API}${path}`;
-  }
-  if (url.startsWith('/uploads/') || url.startsWith('/images/')) {
-    return `${API}${url}`;
-  }
+  const m = url.match(/\/(images|uploads)\/[^?#\s]+/);
+  if (m) return `${API}${m[0]}`;
   return url;
 }
 

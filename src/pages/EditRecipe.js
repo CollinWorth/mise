@@ -219,7 +219,7 @@ function EditRecipe({ user }) {
           <label className="full-width">
             Image
             <div className="ar-image-row">
-              <input type="url" name="image_url" value={form.image_url} onChange={handleChange} placeholder="https://…" />
+              <input type="text" name="image_url" value={form.image_url} onChange={handleChange} placeholder="paste an image URL or use Upload" />
               <button type="button" className="ar-upload-btn" onClick={() => fileRef.current.click()} disabled={uploading}>
                 {uploading ? '…' : '↑ Upload'}
               </button>

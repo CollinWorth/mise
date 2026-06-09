@@ -326,7 +326,7 @@ export default function AddRecipe({ user }) {
               <label className="full-width">
                 Image
                 <div className="ar-image-row">
-                  <input type="url" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://…" />
+                  <input type="text" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="paste an image URL or use Upload" />
                   <button type="button" className="ar-upload-btn" onClick={() => fileRef.current.click()} disabled={uploading}>
                     {uploading ? '…' : '↑ Upload'}
                   </button>

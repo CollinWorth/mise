@@ -941,6 +941,12 @@ async def _maybe_archive_image(url: str | None) -> str | None:
     """
     if not url:
         return url
+    # If the URL contains an /images/{ObjectId} segment anywhere, treat as ours
+    # and normalize to the relative path — handles scheme-less, wrong-host,
+    # and legacy absolute URLs uniformly (e.g. "mise-production-…/images/<id>").
+    m = re.search(r"/images/[0-9a-fA-F]{24}", url)
+    if m:
+        return m.group(0)
     parsed = urlparse(url)
     # Already a relative path (our own served image) — keep as-is
     if not parsed.scheme:

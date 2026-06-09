@@ -35,7 +35,26 @@ Archiving for the latter two happens in **`_maybe_archive_image(url)`** ([backen
 
 ## Rendering
 
-The frontend never uses `image_url` raw — every `<img>` wraps it in `imgUrl()`, which prefixes `/images/` and `/uploads/` paths (and rewrites legacy `localhost` URLs) with `REACT_APP_API_URL`. See Add/Edit previews ([src/pages/AddRecipe.js](../src/pages/AddRecipe.js), [src/pages/EditRecipe.js](../src/pages/EditRecipe.js)).
+The frontend never uses `image_url` raw — every `<img>` wraps it in `imgUrl()`. The current `imgUrl()` is intentionally permissive: it **extracts the first `/images/...` or `/uploads/...` segment from anywhere in the string** and prepends `REACT_APP_API_URL`. If the URL contains no such segment, it's returned unchanged (treated as a true external image). This means broken-shape inputs all render correctly:
+
+- `/images/abc` → `${API}/images/abc` (the canonical case)
+- `https://railway-prod-host/images/abc` (legacy absolute) → `${API}/images/abc`
+- `railway-prod-host/images/abc` (no scheme — e.g. a user-pasted half-URL) → `${API}/images/abc`
+- `https://localhost:8000/images/abc` (old dev) → `${API}/images/abc`
+- `https://example.com/photo.jpg` (genuine external) → unchanged, browser fetches directly
+
+See Add/Edit previews ([src/pages/AddRecipe.js](../src/pages/AddRecipe.js), [src/pages/EditRecipe.js](../src/pages/EditRecipe.js)). The image URL input is `type="text"` (not `type="url"`) so the browser doesn't block submit when a user pastes a half-URL — the backend normalizes on save.
+
+## Save-time normalization (defensive)
+
+`_maybe_archive_image` ([backend/routers/recipes.py](../backend/routers/recipes.py)) has a fast-path before its existing scheme/host checks: **if the URL contains `/images/{24-hex-ObjectId}` anywhere, it's normalized to that relative path** and short-circuits the rest of the function. ObjectId-shape paths are unambiguously ours (it's the exact shape `POST /recipes/upload-image` and the archiver emit), so this is safe regardless of scheme, host, or proxy prefix. After this check, the existing logic handles:
+
+1. Empty / scheme-less / pure-relative → returned unchanged.
+2. Absolute URL on our own host (`localhost`/`127.0.0.1` or `BASE_URL` host) → reduced to its path.
+3. Genuine external `http(s)` image → downloaded and archived to `/images/{id}`.
+4. Failures → original URL returned (non-fatal).
+
+The net result: whatever shape the user pastes, the DB ends up with a clean relative `/images/{id}` whenever the input was actually ours, and renders correctly even before save.
 
 ## Mobile (web app) camera & photo library
 
@@ -49,12 +68,13 @@ The upload control is a hidden `<input type="file" accept="image/*">` triggered 
 - [x] Upload fixed: endpoint returns a **relative** `/images/{id}` path; frontend `imgUrl()` builds the correct absolute URL per environment. Removed the `_public_base_url` / `BASE_URL` dependency.
 - [x] Upload validation: rejects non-image content types (400) and images over `MAX_IMAGE_BYTES` (10 MB → 413), keeping docs under MongoDB's 16 MB BSON limit.
 - [x] Mobile camera/library: handled by `accept="image/*"` (verified markup; no `capture` so the user can choose).
+- [x] **Forgiving URL handling for legacy / broken-shape image links.** `imgUrl()` now extracts any embedded `/images/...` or `/uploads/...` segment from arbitrary strings, so legacy DB rows with absolute Railway/duckdns URLs and user-pasted half-URLs (e.g. missing `https://`) render correctly without a backfill. The Add/Edit image input is `type="text"` so non-URL-shaped strings don't block form submit. `_maybe_archive_image` has a matching fast-path: any URL containing `/images/{24-hex}` is normalized to the relative path at save time, so storage stays clean going forward.
 
 ### Verified
 - Local end-to-end test: `POST /recipes/upload-image` → returns `/images/{id}` → `GET /images/{id}` serves the bytes (200, correct content-type). External-URL archiving exercised via `_maybe_archive_image`.
 
 ### Remaining / follow-ups
 - **Server-side downscaling/compression** (e.g. Pillow): cap dimensions and re-encode so large phone photos shrink before hitting the 16 MB limit. Currently only a hard size cap exists.
-- **Backfill legacy data**: existing recipes with old absolute `https://…duckdns.org/images/{id}` (no `/api`) or vanished `/uploads/...` links remain broken until re-fetched/rewritten. A one-off migration could re-archive from source where available and rewrite stored URLs to relative paths.
+- **Backfill legacy data** *(now cosmetic, not functional).* The forgiving `imgUrl()` + save-time normalization above makes legacy absolute URLs **render correctly** without touching the DB. A one-off migration to rewrite stored URLs to canonical `/images/{id}` form is still nice for cleanliness, but no longer required to fix display. Vanished `/uploads/...` links remain a separate problem — those files don't exist on disk and can't be recovered without re-fetching from the original source.
 - **Consider GridFS** if images regularly approach the BSON limit (or to stream large files), instead of inlining bytes in a single document.
 - **Orphan cleanup**: images in the collection are never deleted when a recipe is deleted or its image replaced; a periodic sweep could reclaim them.
