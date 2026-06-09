@@ -1,20 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-
 export default function LazyImage({ src, alt = '', eager = false, ...rest }) {
-  const ref = useRef(null);
-  const [show, setShow] = useState(eager);
-
-  useEffect(() => {
-    if (show) return;
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === 'undefined') { setShow(true); return; }
-    const observer = new IntersectionObserver(
-      entries => { if (entries.some(e => e.isIntersecting)) { setShow(true); observer.disconnect(); } },
-      { rootMargin: '800px 0px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [show]);
-
-  return <img ref={ref} src={show ? src : undefined} alt={alt} {...rest} />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      {...rest}
+    />
+  );
 }
