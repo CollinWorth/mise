@@ -67,8 +67,9 @@ This router holds most of the app's logic. Recipes can be created three ways, wi
 
 ## Deployment
 
+- **Frontend → Vercel**: the React app's production host. Vercel builds preview deployments per-branch/PR automatically; merging/pushing to the production branch triggers an atomic deploy with no downtime for users already loaded (new requests get the new build; in-flight sessions aren't killed).
 - **Backend → Railway**: root [Dockerfile](Dockerfile) (and identical [backend/Dockerfile](backend/Dockerfile)) build only the FastAPI service; [railway.toml](railway.toml) points at it. It downloads the NLTK tagger at build time and runs uvicorn on `$PORT`.
-- **Self-hosted**: [deploy.sh](deploy.sh) pulls, installs deps, builds the frontend, and (re)starts `api` + `frontend` processes under **PM2** (frontend served from `build/` on port 3001).
-- **Frontend Docker**: [Dockerfile.frontend](Dockerfile.frontend) + [docker-compose.yml](docker-compose.yml) build/serve the React app, baking in `REACT_APP_API_URL` at build time.
+- **Self-hosted (legacy, being decommissioned)**: [deploy.sh](deploy.sh) pulls, installs deps, builds the frontend, and (re)starts `api` + `frontend` processes under **PM2** (frontend served from `build/` on port 3001). Still technically running but slated for removal soon — don't invest in it.
+- **Frontend Docker (legacy)**: [Dockerfile.frontend](Dockerfile.frontend) + [docker-compose.yml](docker-compose.yml) build/serve the React app, baking in `REACT_APP_API_URL` at build time. Superseded by Vercel.
 
-The committed `build/` directory is a checked-in production build of the frontend — regenerate it with `npm run build` rather than editing by hand.
+The committed `build/` directory is a checked-in production build of the frontend (used by the legacy PM2 path) — regenerate it with `npm run build` rather than editing by hand.
