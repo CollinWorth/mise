@@ -85,7 +85,7 @@ function NavBar({ user, onLogout }) {
             {user ? (
               <div className="nav-main-links">
                 <NavLink to="/discover"     current={location.pathname} aliases={['/discover','/explore','/feed']}>Discover</NavLink>
-                <NavLink to="/recipes"      current={location.pathname}>Recipes</NavLink>
+                <NavLink to="/recipes"      current={location.pathname} aliases={['/recipes','/']}>Recipes</NavLink>
                 <NavLink to="/calendar"     current={location.pathname}>Planner</NavLink>
                 <NavLink to="/grocery-list" current={location.pathname}>Grocery</NavLink>
               </div>
@@ -126,7 +126,7 @@ function NavBar({ user, onLogout }) {
         <BottomTab to="/discover" label="Discover" icon={<DiscoverIcon />} current={location.pathname} aliases={['/discover','/explore','/feed']} />
         {user ? (
           <>
-            <BottomTab to="/recipes"      label="Recipes" icon={<RecipesIcon />} current={location.pathname} />
+            <BottomTab to="/recipes"      label="Recipes" icon={<RecipesIcon />} current={location.pathname} aliases={['/recipes','/']} />
             <BottomTab to="/calendar"     label="Planner" icon={<PlannerIcon />} current={location.pathname} />
             <BottomTab to="/grocery-list" label="Grocery" icon={<GroceryIcon />} current={location.pathname} />
             <div className="nav-bottom-profile-wrap" ref={bottomProfileRef}>

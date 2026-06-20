@@ -111,7 +111,6 @@
 /* Cuisine dropdown */
 .ex-cuisine-wrap { position: relative; flex-shrink: 0; }
 .ex-cuisine-dropdown {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 50;
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-lg);
   min-width: 180px; max-height: 280px; overflow-y: auto;
