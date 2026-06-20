@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
 import StarRating from '../components/StarRating';
+import FilterDropdown from '../components/FilterDropdown';
 import './css/Recipes.css';
 
 const SORT_OPTIONS = [
@@ -73,26 +74,6 @@ export default function Recipes({ user }) {
       .then(data => { setRecipes(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [user]);
-
-  useEffect(() => {
-    const refs = [
-      [sortOpen,    sortRef,    setSortOpen],
-      [cuisineOpen, cuisineRef, setCuisineOpen],
-      [tagsOpen,    tagsRef,    setTagsOpen],
-      [timeOpen,    timeRef,    setTimeOpen],
-    ];
-    const handlers = refs.map(([open, ref, setter]) => {
-      if (!open) return null;
-      const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setter(false); };
-      document.addEventListener('mousedown', h);
-      return h;
-    });
-    return () => {
-      refs.forEach(([,, setter], i) => {
-        if (handlers[i]) document.removeEventListener('mousedown', handlers[i]);
-      });
-    };
-  }, [sortOpen, cuisineOpen, tagsOpen, timeOpen]);
 
   if (!user) {
     return (
@@ -220,17 +201,15 @@ export default function Recipes({ user }) {
                 <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            {sortOpen && (
-              <div className="recipes-dropdown">
-                {SORT_OPTIONS.map(o => (
-                  <button key={o.value}
-                    className={`recipes-dropdown-item${sort === o.value ? ' recipes-dropdown-item--active' : ''}`}
-                    onClick={() => { setSort(o.value); setSortOpen(false); }}>
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <FilterDropdown open={sortOpen} anchorRef={sortRef} onClose={() => setSortOpen(false)} className="recipes-dropdown">
+              {SORT_OPTIONS.map(o => (
+                <button key={o.value}
+                  className={`recipes-dropdown-item${sort === o.value ? ' recipes-dropdown-item--active' : ''}`}
+                  onClick={() => { setSort(o.value); setSortOpen(false); }}>
+                  {o.label}
+                </button>
+              ))}
+            </FilterDropdown>
           </div>
 
           {/* Cuisine */}
@@ -243,23 +222,21 @@ export default function Recipes({ user }) {
                   <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              {cuisineOpen && (
-                <div className="recipes-dropdown">
-                  {activeCuisine && (
-                    <button className="recipes-dropdown-item recipes-dropdown-item--clear"
-                      onClick={() => { setActiveCuisine(null); setCuisineOpen(false); }}>
-                      ✕ Clear
-                    </button>
-                  )}
-                  {cuisineOptions.map(c => (
-                    <button key={c}
-                      className={`recipes-dropdown-item${activeCuisine === c ? ' recipes-dropdown-item--active' : ''}`}
-                      onClick={() => { setActiveCuisine(activeCuisine === c ? null : c); setCuisineOpen(false); }}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <FilterDropdown open={cuisineOpen} anchorRef={cuisineRef} onClose={() => setCuisineOpen(false)} className="recipes-dropdown">
+                {activeCuisine && (
+                  <button className="recipes-dropdown-item recipes-dropdown-item--clear"
+                    onClick={() => { setActiveCuisine(null); setCuisineOpen(false); }}>
+                    ✕ Clear
+                  </button>
+                )}
+                {cuisineOptions.map(c => (
+                  <button key={c}
+                    className={`recipes-dropdown-item${activeCuisine === c ? ' recipes-dropdown-item--active' : ''}`}
+                    onClick={() => { setActiveCuisine(activeCuisine === c ? null : c); setCuisineOpen(false); }}>
+                    {c}
+                  </button>
+                ))}
+              </FilterDropdown>
             </div>
           )}
 
@@ -272,17 +249,15 @@ export default function Recipes({ user }) {
                 <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            {timeOpen && (
-              <div className="recipes-dropdown">
-                {[['any','Any time'],['30','≤ 30 min'],['60','≤ 1 hour']].map(([val, label]) => (
-                  <button key={val}
-                    className={`recipes-dropdown-item${timeFilter === val ? ' recipes-dropdown-item--active' : ''}`}
-                    onClick={() => { setTimeFilter(val); setTimeOpen(false); }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <FilterDropdown open={timeOpen} anchorRef={timeRef} onClose={() => setTimeOpen(false)} className="recipes-dropdown">
+              {[['any','Any time'],['30','≤ 30 min'],['60','≤ 1 hour']].map(([val, label]) => (
+                <button key={val}
+                  className={`recipes-dropdown-item${timeFilter === val ? ' recipes-dropdown-item--active' : ''}`}
+                  onClick={() => { setTimeFilter(val); setTimeOpen(false); }}>
+                  {label}
+                </button>
+              ))}
+            </FilterDropdown>
           </div>
 
           {/* Tags */}
@@ -295,23 +270,21 @@ export default function Recipes({ user }) {
                   <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              {tagsOpen && (
-                <div className="recipes-dropdown recipes-dropdown--tags">
-                  {activeTags.size > 0 && (
-                    <button className="recipes-dropdown-item recipes-dropdown-item--clear"
-                      onClick={() => setActiveTags(new Set())}>
-                      ✕ Clear tags
-                    </button>
-                  )}
-                  {allTags.slice(0, 20).map(t => (
-                    <button key={t}
-                      className={`recipes-dropdown-item${activeTags.has(t) ? ' recipes-dropdown-item--active' : ''}`}
-                      onClick={() => toggleTag(t)}>
-                      #{t}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <FilterDropdown open={tagsOpen} anchorRef={tagsRef} onClose={() => setTagsOpen(false)} className="recipes-dropdown recipes-dropdown--tags">
+                {activeTags.size > 0 && (
+                  <button className="recipes-dropdown-item recipes-dropdown-item--clear"
+                    onClick={() => setActiveTags(new Set())}>
+                    ✕ Clear tags
+                  </button>
+                )}
+                {allTags.slice(0, 20).map(t => (
+                  <button key={t}
+                    className={`recipes-dropdown-item${activeTags.has(t) ? ' recipes-dropdown-item--active' : ''}`}
+                    onClick={() => toggleTag(t)}>
+                    #{t}
+                  </button>
+                ))}
+              </FilterDropdown>
             </div>
           )}
 

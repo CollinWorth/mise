@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { apiFetch, imgUrl } from '../api';
 import LazyImage from '../components/LazyImage';
+import FilterDropdown from '../components/FilterDropdown';
 import './css/ExplorePage.css';
 import './css/FeedPage.css';
 
@@ -84,12 +85,6 @@ export default function DiscoverPage({ user }) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!cuisineOpen) return;
-    const handler = (e) => { if (cuisineRef.current && !cuisineRef.current.contains(e.target)) setCuisineOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [cuisineOpen]);
 
   useEffect(() => {
     apiFetch('/recipes/explore')
@@ -260,23 +255,21 @@ export default function DiscoverPage({ user }) {
                   <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              {cuisineOpen && (
-                <div className="ex-cuisine-dropdown">
-                  {activeCuisine && (
-                    <button className="ex-cuisine-item ex-cuisine-item--clear"
-                      onClick={() => { setActiveCuisine(null); setCuisineOpen(false); }}>
-                      ✕ Clear
-                    </button>
-                  )}
-                  {cuisineOptions.map(c => (
-                    <button key={c}
-                      className={`ex-cuisine-item${activeCuisine === c ? ' ex-cuisine-item--active' : ''}`}
-                      onClick={() => { setActiveCuisine(activeCuisine === c ? null : c); setCuisineOpen(false); }}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <FilterDropdown open={cuisineOpen} anchorRef={cuisineRef} onClose={() => setCuisineOpen(false)} className="ex-cuisine-dropdown">
+                {activeCuisine && (
+                  <button className="ex-cuisine-item ex-cuisine-item--clear"
+                    onClick={() => { setActiveCuisine(null); setCuisineOpen(false); }}>
+                    ✕ Clear
+                  </button>
+                )}
+                {cuisineOptions.map(c => (
+                  <button key={c}
+                    className={`ex-cuisine-item${activeCuisine === c ? ' ex-cuisine-item--active' : ''}`}
+                    onClick={() => { setActiveCuisine(activeCuisine === c ? null : c); setCuisineOpen(false); }}>
+                    {c}
+                  </button>
+                ))}
+              </FilterDropdown>
             </div>
 
             {/* Quick toggle */}
